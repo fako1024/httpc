@@ -38,6 +38,7 @@ type Request struct {
 	method      string
 	uri         string
 	host        string
+	timeout     time.Duration
 	queryParams map[string]string
 	headers     map[string]string
 	body        []byte
@@ -60,9 +61,15 @@ func New(method, uri string) *Request {
 	}
 }
 
-// HostName sets an explicity hostname for the client call
+// HostName sets an explicit hostname for the client call
 func (r *Request) HostName(host string) *Request {
 	r.host = host
+	return r
+}
+
+// Timeout sets timeout for the client call
+func (r *Request) Timeout(timeout time.Duration) *Request {
+	r.timeout = timeout
 	return r
 }
 
@@ -165,6 +172,9 @@ func (r *Request) Run() error {
 	client := http.DefaultClient
 	if r.skipCertificateVerification {
 		client = skipTLSVerifyClient
+	}
+	if r.timeout > 0 {
+		client.Timeout = r.timeout
 	}
 	if r.httpClientFunc != nil {
 		r.httpClientFunc(client)
