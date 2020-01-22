@@ -28,6 +28,12 @@ import (
 	"github.com/labstack/echo"
 )
 
+var defaultacceptedResponseCodes = []int{
+	http.StatusOK,
+	http.StatusCreated,
+	http.StatusAccepted,
+}
+
 // Params is an alias for a map of string key / value pairs
 type Params = map[string]string
 
@@ -48,7 +54,8 @@ type Request struct {
 	openAPIValidationFileData   []byte
 	delay                       time.Duration
 
-	httpClientFunc func(c *http.Client)
+	acceptedResponseCodes []int
+	httpClientFunc        func(c *http.Client)
 }
 
 // New instantiates a new http client
@@ -56,8 +63,9 @@ func New(method, uri string) *Request {
 
 	// Instantiate a new NectIdent service using default options
 	return &Request{
-		method: method,
-		uri:    uri,
+		method:                method,
+		uri:                   uri,
+		acceptedResponseCodes: defaultacceptedResponseCodes,
 	}
 }
 
@@ -120,6 +128,13 @@ func (r *Request) Delay(delay time.Duration) *Request {
 // underlying HTTP client before the actual request is made
 func (r *Request) ModifyHTTPClient(fn func(c *http.Client)) *Request {
 	r.httpClientFunc = fn
+	return r
+}
+
+// AcceptedResponseCodes defines a set of accepted HTTP response codes for the
+// client call
+func (r *Request) AcceptedResponseCodes(acceptedResponseCodes []int) *Request {
+	r.acceptedResponseCodes = acceptedResponseCodes
 	return r
 }
 
@@ -241,7 +256,10 @@ func (r *Request) Run() error {
 	}
 
 	// Check if the query was successful
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
+	if len(r.acceptedResponseCodes) == 0 {
+		return fmt.Errorf("No accepted HTTP response codes set, considering request to be failed (Got %d)", resp.StatusCode)
+	}
+	if isAnyOf(resp.StatusCode, r.acceptedResponseCodes) {
 
 		// Read the binary data from the response body
 		var extraErr echo.HTTPError
@@ -282,4 +300,14 @@ var skipTLSVerifyClient = &http.Client{
 			InsecureSkipVerify: true,
 		},
 	},
+}
+
+func isAnyOf(val int, ref []int) bool {
+	for _, v := range ref {
+		if v == val {
+			return true
+		}
+	}
+
+	return false
 }
