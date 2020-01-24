@@ -259,7 +259,7 @@ func (r *Request) Run() error {
 	if len(r.acceptedResponseCodes) == 0 {
 		return fmt.Errorf("No accepted HTTP response codes set, considering request to be failed (Got %d)", resp.StatusCode)
 	}
-	if isAnyOf(resp.StatusCode, r.acceptedResponseCodes) {
+	if !isAnyOf(resp.StatusCode, r.acceptedResponseCodes) {
 
 		// Read the binary data from the response body
 		var extraErr echo.HTTPError
