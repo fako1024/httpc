@@ -69,6 +69,21 @@ func New(method, uri string) *Request {
 	}
 }
 
+// GetMethod returns the method of the request
+func (r *Request) GetMethod() string {
+	return r.method
+}
+
+// GetURI returns the URI of the request
+func (r *Request) GetURI() string {
+	return r.uri
+}
+
+// GetBody returns the body of the request
+func (r *Request) GetBody() []byte {
+	return r.body
+}
+
 // HostName sets an explicit hostname for the client call
 func (r *Request) HostName(host string) *Request {
 	r.host = host
