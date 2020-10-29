@@ -3,6 +3,7 @@ package httpc
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"testing"
@@ -20,16 +21,49 @@ var (
 	endpoint = "http://api.example.org"
 )
 
-var testRequests = map[*Request]testCase{
-	New(http.MethodGet, path.Join(endpoint, "simple_ok")): {
-		expectedStatusCode: http.StatusOK,
-		responseFn: func(resp *http.Response) error {
-			return nil
-		},
-	},
-}
-
 func TestTable(t *testing.T) {
+
+	var testRequests = map[*Request]testCase{
+		New(http.MethodGet, path.Join(endpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+			responseFn: func(resp *http.Response) error {
+				return nil
+			},
+		},
+		New(http.MethodPost, path.Join(endpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+			responseFn: func(resp *http.Response) error {
+				return nil
+			},
+		},
+		New(http.MethodPut, path.Join(endpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+			responseFn: func(resp *http.Response) error {
+				return nil
+			},
+		},
+		New(http.MethodDelete, path.Join(endpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+			responseFn: func(resp *http.Response) error {
+				return nil
+			},
+		},
+		New(http.MethodGet, path.Join(endpoint, "string_message")): {
+			expectedStatusCode: http.StatusOK,
+			body:               []byte("Hello, world! 你好世界 😊😎"),
+			responseFn: func(resp *http.Response) error {
+				bodyBytes, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					return err
+				}
+				if string(bodyBytes) != "Hello, world! 你好世界 😊😎" {
+					return fmt.Errorf("Unexpected response body string, want `Hello, world! 你好世界 😊😎`, have `%s`", string(bodyBytes))
+				}
+				return nil
+			},
+		},
+	}
+
 	for k, v := range testRequests {
 		t.Run(fmt.Sprintf("%s %s", k.method, k.uri), func(t *testing.T) {
 
@@ -50,14 +84,15 @@ func TestTable(t *testing.T) {
 				g.Put(path.Base(k.uri))
 			case http.MethodDelete:
 				g.Delete(path.Base(k.uri))
+			default:
+				t.Fatalf("Unsupported HTTP method requested: %s", k.method)
 			}
 
-			// Define the return code
-			g.Reply(v.expectedStatusCode)
-
-			// Define the return body, if provided
+			// Define the return code (and body, if provided)
 			if v.body != nil {
-				g.Body(bytes.NewBuffer(v.body))
+				g.Reply(v.expectedStatusCode).Body(bytes.NewBuffer(v.body))
+			} else {
+				g.Reply(v.expectedStatusCode)
 			}
 
 			// Execute and parse the result (if parsing function was provided)
