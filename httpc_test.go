@@ -1,79 +1,70 @@
 package httpc
 
 import (
+	"bytes"
 	"fmt"
-	"net"
 	"net/http"
-	"os"
+	"path"
 	"testing"
-	"time"
 
-	"github.com/valyala/fasthttp"
+	"gopkg.in/h2non/gock.v1"
 )
 
-var testRequests = map[*Request]func(resp *http.Response) error{
-	New("GET", "http://127.0.0.1:22632/foo"): func(resp *http.Response) error {
-		return nil
+type testCase struct {
+	expectedStatusCode int
+	body               []byte
+	responseFn         func(resp *http.Response) error
+}
+
+var (
+	endpoint = "http://api.example.org"
+)
+
+var testRequests = map[*Request]testCase{
+	New(http.MethodGet, path.Join(endpoint, "simple_ok")): {
+		expectedStatusCode: http.StatusOK,
+		responseFn: func(resp *http.Response) error {
+			return nil
+		},
 	},
 }
 
 func TestTable(t *testing.T) {
 	for k, v := range testRequests {
 		t.Run(fmt.Sprintf("%s %s", k.method, k.uri), func(t *testing.T) {
-			err := k.ParseFn(v).Run()
+
+			// Set up a mock matcher for this particular case
+			defer gock.Off()
+
+			// Initialize mock server, intercepting all traffic to the mock URI
+			// and returning the expected data for this particular test case
+			g := gock.New(k.uri)
+
+			// Define the method based on the test case
+			switch k.method {
+			case http.MethodGet:
+				g.Get(path.Base(k.uri))
+			case http.MethodPost:
+				g.Post(path.Base(k.uri))
+			case http.MethodPut:
+				g.Put(path.Base(k.uri))
+			case http.MethodDelete:
+				g.Delete(path.Base(k.uri))
+			}
+
+			// Define the return code
+			g.Reply(v.expectedStatusCode)
+
+			// Define the return body, if provided
+			if v.body != nil {
+				g.Body(bytes.NewBuffer(v.body))
+			}
+
+			// Execute and parse the result (if parsing function was provided)
+			err := k.ParseFn(v.responseFn).Run()
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 	}
 }
-
-////////////////////////////////////////////////////////////////////////////////
-
-func TestMain(m *testing.M) {
-
-	// the corresponding fasthttp code
-	server := func(ctx *fasthttp.RequestCtx) {
-		switch string(ctx.Path()) {
-		case "/foo":
-			fooHandlerFunc(ctx)
-		// case "/bar":
-		// 	barHandlerFunc(ctx)
-		default:
-			ctx.Error("not found", fasthttp.StatusNotFound)
-		}
-	}
-
-	// Start test server
-	go func() {
-		if err := fasthttp.ListenAndServe("127.0.0.1:22632", server); err != nil {
-			fmt.Printf("Failed to start test server: %s\n", err)
-			os.Exit(1)
-		}
-	}()
-
-	var err error
-	for try := 0; try < 10; try++ {
-		_, err = net.DialTimeout("tcp", "127.0.0.1:22632", time.Second)
-		if err == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if err != nil {
-		fmt.Printf("Connectivity test failed: %s\n", err)
-		os.Exit(1)
-	}
-
-	os.Exit(m.Run())
-}
-
-func fooHandlerFunc(ctx *fasthttp.RequestCtx) {
-	fmt.Fprintf(ctx, "Hello, world!\n\n")
-	ctx.SetContentType("text/plain; charset=utf8")
-}
-
-// func echoHandlerFunc(ctx *fasthttp.RequestCtx) {
-// 	fmt.Fprintf(ctx, ctx.Request.Body())
-// 	ctx.SetContentType("text/plain; charset=utf8")
-// }
