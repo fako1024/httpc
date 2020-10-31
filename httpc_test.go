@@ -15,6 +15,7 @@ import (
 
 type testCase struct {
 	expectedStatusCode int
+	requestBody        []byte
 	responseBody       []byte
 	responseFn         func(resp *http.Response) error
 
@@ -23,6 +24,10 @@ type testCase struct {
 
 	hostName string
 }
+
+const (
+	helloWorldString = "Hello, world! 你好世界 😊😎"
+)
 
 var (
 	httpEndpoint  = "http://api.example.org"
@@ -51,6 +56,40 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+func TestClientDelay(t *testing.T) {
+
+	uri := joinURI(httpsEndpoint, "delay")
+
+	// Set up a mock matcher
+	defer gock.Off()
+
+	g := gock.New(uri)
+	g.Get(path.Base(uri)).
+		AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
+			bodyBytes, err := ioutil.ReadAll(arg1.Body)
+			if err != nil {
+				return false, err
+			}
+			return bytes.Equal(bodyBytes, []byte(helloWorldString)), nil
+		})).
+		Reply(http.StatusOK)
+
+	// Define request disabling certificate validation
+	start := time.Now()
+	req := New(http.MethodGet, uri).Body([]byte(helloWorldString)).Delay(50 * time.Millisecond)
+
+	// Execute the request
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the latency of the request
+	if lat := time.Now().Sub(start); lat < 50*time.Millisecond {
+		t.Fatalf("Delayed request unexpectedly too fast, latency %v", lat)
+	}
+
+}
+
 func TestSkipCertificateValidation(t *testing.T) {
 
 	uri := joinURI(httpsEndpoint, "secure")
@@ -71,6 +110,40 @@ func TestSkipCertificateValidation(t *testing.T) {
 	// Execute the request
 	if err := req.Run(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAcceptedResponseCodes(t *testing.T) {
+
+	if err := testResponseCode([]int{}, http.StatusOK); err == nil || err.Error() != fmt.Sprintf("No accepted HTTP response codes set, considering request to be failed (Got %d)", http.StatusOK) {
+		t.Fatalf("Unexpected success for empty accepted response codes")
+	}
+
+	codes := []int{
+		http.StatusOK,
+		http.StatusGone,
+		http.StatusLocked,
+		http.StatusCreated,
+		http.StatusAccepted,
+		http.StatusContinue,
+		http.StatusNoContent,
+	}
+
+	var acceptedCodes []int
+	for i, acceptedCode := range codes {
+		acceptedCodes = append(acceptedCodes, acceptedCode)
+
+		for _, returnedCode := range codes[:i+1] {
+			if err := testResponseCode(acceptedCodes, returnedCode); err != nil {
+				t.Fatalf("Unexpected failure for code %d, accepted codes %v: %s", returnedCode, acceptedCodes, err)
+			}
+		}
+
+		for _, returnedCode := range codes[i+1:] {
+			if err := testResponseCode(acceptedCodes, returnedCode); err == nil {
+				t.Fatalf("Unexpected success for code %d, accepted codes %v", returnedCode, acceptedCodes)
+			}
+		}
 	}
 }
 
@@ -107,15 +180,19 @@ func TestTable(t *testing.T) {
 				"X-TEST-HEADER-2": "zHW4aaMhMJzrA5eJtahB 你好世界 😊😎",
 			},
 		},
-		New(http.MethodGet, joinURI(httpEndpoint, "string_message")): {
+		New(http.MethodGet, joinURI(httpEndpoint, "string_request")): {
 			expectedStatusCode: http.StatusOK,
-			responseBody:       []byte("Hello, world! 你好世界 😊😎"),
+			requestBody:        []byte(helloWorldString),
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "string_response")): {
+			expectedStatusCode: http.StatusOK,
+			responseBody:       []byte(helloWorldString),
 			responseFn: func(resp *http.Response) error {
 				bodyBytes, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
 					return err
 				}
-				if string(bodyBytes) != "Hello, world! 你好世界 😊😎" {
+				if string(bodyBytes) != helloWorldString {
 					return fmt.Errorf("Unexpected response body string, want `Hello, world! 你好世界 😊😎`, have `%s`", string(bodyBytes))
 				}
 				return nil
@@ -164,6 +241,17 @@ func TestTable(t *testing.T) {
 				g.MatchHeaders(v.headers)
 			}
 
+			// Handle request body
+			if v.requestBody != nil {
+				g.AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
+					bodyBytes, err := ioutil.ReadAll(arg1.Body)
+					if err != nil {
+						return false, err
+					}
+					return bytes.Equal(bodyBytes, v.requestBody), nil
+				}))
+			}
+
 			// Define the return code (and body, if provided)
 			if v.responseBody != nil {
 				g.Reply(v.expectedStatusCode).Body(bytes.NewBuffer(v.responseBody))
@@ -193,6 +281,11 @@ func TestTable(t *testing.T) {
 				req.Headers(v.headers)
 			}
 
+			// Handle request body
+			if v.requestBody != nil {
+				req.Body(v.requestBody)
+			}
+
 			// Execute the request
 			if err := req.Run(); err != nil {
 				t.Fatal(err)
@@ -216,6 +309,24 @@ func testGetters(req *Request) error {
 	}
 
 	return nil
+}
+
+func testResponseCode(codes []int, returnCode int) error {
+
+	uri := joinURI(httpEndpoint, "codes")
+
+	// Set up a mock matcher
+	defer gock.Off()
+
+	g := gock.New(uri)
+	g.Get(path.Base(uri)).
+		Reply(returnCode)
+
+	// Define request disabling certificate validation
+	req := New(http.MethodGet, uri).AcceptedResponseCodes(codes)
+
+	// Execute the request
+	return req.Run()
 }
 
 func joinURI(base, suffix string) string {
