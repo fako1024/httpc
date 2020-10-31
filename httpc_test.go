@@ -258,96 +258,100 @@ func TestTable(t *testing.T) {
 
 	for k, v := range testRequests {
 		t.Run(fmt.Sprintf("%s %s", k.method, k.uri), func(t *testing.T) {
-
-			// Set up a mock matcher for this particular case
-			defer gock.Off()
-
-			// Initialize mock server, intercepting all traffic to the mock URI
-			// and returning the expected data for this particular test case
-			g := gock.New(k.uri)
-
-			// Define the method based on the test case
-			switch k.method {
-			case http.MethodGet:
-				g.Get(path.Base(k.uri))
-			case http.MethodPost:
-				g.Post(path.Base(k.uri))
-			case http.MethodPut:
-				g.Put(path.Base(k.uri))
-			case http.MethodDelete:
-				g.Delete(path.Base(k.uri))
-			default:
-				t.Fatalf("Unsupported HTTP method requested: %s", k.method)
-			}
-
-			// Handle hostnames
-			if v.hostName != "" {
-				g.AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
-					return arg1.Host == v.hostName, nil
-				}))
-			}
-
-			// Handle query parameters
-			if len(v.queryParams) > 0 {
-				g.MatchParams(v.queryParams)
-			}
-
-			// Handle headers
-			if len(v.headers) > 0 {
-				g.MatchHeaders(v.headers)
-			}
-
-			// Handle request body
-			if v.requestBody != nil {
-				g.AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
-					bodyBytes, err := ioutil.ReadAll(arg1.Body)
-					if err != nil {
-						return false, err
-					}
-					return bytes.Equal(bodyBytes, v.requestBody), nil
-				}))
-			}
-
-			// Define the return code (and body, if provided)
-			if v.responseBody != nil {
-				g.Reply(v.expectedStatusCode).Body(bytes.NewBuffer(v.responseBody))
-			} else {
-				g.Reply(v.expectedStatusCode)
-			}
-
-			// Execute and parse the result (if parsing function was provided)
-			req := k.ParseFn(v.responseFn)
-
-			if err := testGetters(req); err != nil {
-				t.Fatalf("Getter validation failed: %s", err)
-			}
-
-			// If a hostname was provided, set it
-			if v.hostName != "" {
-				req.HostName(v.hostName)
-			}
-
-			// Handle query parameters
-			if len(v.queryParams) > 0 {
-				req.QueryParams(v.queryParams)
-			}
-
-			// Handle headers
-			if len(v.headers) > 0 {
-				req.Headers(v.headers)
-			}
-
-			// Handle request body
-			if v.requestBody != nil {
-				req.Body(v.requestBody)
-			}
-
-			// Execute the request
-			if err := req.Run(); err != nil {
-				t.Fatal(err)
+			if err := runGenericRequest(k, v); err != nil {
+				t.Fatalf("Failed running test: %s", err)
 			}
 		})
 	}
+}
+
+func runGenericRequest(k *Request, v testCase) error {
+
+	// Set up a mock matcher for this particular case
+	defer gock.Off()
+
+	// Initialize mock server, intercepting all traffic to the mock URI
+	// and returning the expected data for this particular test case
+	g := gock.New(k.uri)
+
+	// Define the method based on the test case
+	switch k.method {
+	case http.MethodGet:
+		g.Get(path.Base(k.uri))
+	case http.MethodPost:
+		g.Post(path.Base(k.uri))
+	case http.MethodPut:
+		g.Put(path.Base(k.uri))
+	case http.MethodDelete:
+		g.Delete(path.Base(k.uri))
+	default:
+		return fmt.Errorf("Unsupported HTTP method requested: %s", k.method)
+	}
+
+	// Handle hostnames
+	if v.hostName != "" {
+		g.AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
+			return arg1.Host == v.hostName, nil
+		}))
+	}
+
+	// Handle query parameters
+	if len(v.queryParams) > 0 {
+		g.MatchParams(v.queryParams)
+	}
+
+	// Handle headers
+	if len(v.headers) > 0 {
+		g.MatchHeaders(v.headers)
+	}
+
+	// Handle request body
+	if v.requestBody != nil {
+		g.AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
+			bodyBytes, err := ioutil.ReadAll(arg1.Body)
+			if err != nil {
+				return false, err
+			}
+			return bytes.Equal(bodyBytes, v.requestBody), nil
+		}))
+	}
+
+	// Define the return code (and body, if provided)
+	if v.responseBody != nil {
+		g.Reply(v.expectedStatusCode).Body(bytes.NewBuffer(v.responseBody))
+	} else {
+		g.Reply(v.expectedStatusCode)
+	}
+
+	// Execute and parse the result (if parsing function was provided)
+	req := k.ParseFn(v.responseFn)
+
+	if err := testGetters(req); err != nil {
+		return fmt.Errorf("Getter validation failed: %s", err)
+	}
+
+	// If a hostname was provided, set it
+	if v.hostName != "" {
+		req.HostName(v.hostName)
+	}
+
+	// Handle query parameters
+	if len(v.queryParams) > 0 {
+		req.QueryParams(v.queryParams)
+	}
+
+	// Handle headers
+	if len(v.headers) > 0 {
+		req.Headers(v.headers)
+	}
+
+	// Handle request body
+	if v.requestBody != nil {
+		req.Body(v.requestBody)
+	}
+
+	// Execute the request
+	return req.Run()
 }
 
 func testGetters(req *Request) error {
