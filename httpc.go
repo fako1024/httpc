@@ -45,8 +45,8 @@ type Request struct {
 	uri         string
 	host        string
 	timeout     time.Duration
-	queryParams map[string]string
-	headers     map[string]string
+	queryParams Params
+	headers     Params
 	body        []byte
 	parseFn     func(resp *http.Response) error
 

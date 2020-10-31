@@ -15,14 +15,18 @@ import (
 
 type testCase struct {
 	expectedStatusCode int
-	body               []byte
+	responseBody       []byte
 	responseFn         func(resp *http.Response) error
+
+	queryParams Params
+	headers     Params
 
 	hostName string
 }
 
 var (
-	endpoint = "http://api.example.org"
+	httpEndpoint  = "http://api.example.org"
+	httpsEndpoint = "https://api.example.org"
 )
 
 func TestTimeout(t *testing.T) {
@@ -30,15 +34,10 @@ func TestTimeout(t *testing.T) {
 	// Define a URI that safely won't exist on localhost
 	uri := "http://127.0.0.1/uiatbucacajdahgsdkjasdgcagagd/timeout"
 
-	// Set up a mock matcher for this particular case
+	// Set up a mock matcher
 	defer gock.Off()
 	defer gock.DisableNetworking()
-
-	// Initialize mock server, intercepting all traffic to the mock URI
-	// and returning the expected data for this particular test case
 	g := gock.New(uri).EnableNetworking()
-
-	// Prepare the mock response
 	g.Get(path.Base(uri)).
 		Reply(http.StatusOK)
 
@@ -50,46 +49,67 @@ func TestTimeout(t *testing.T) {
 	if err := req.Run(); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context deadline exceeded", uri) {
 		t.Fatal(err)
 	}
+}
 
+func TestSkipCertificateValidation(t *testing.T) {
+
+	uri := joinURI(httpsEndpoint, "secure")
+
+	// Set up a mock matcher
+	defer gock.Off()
+
+	gock.InterceptClient(skipTLSVerifyClient)
+	defer gock.RestoreClient(skipTLSVerifyClient)
+
+	g := gock.New(uri)
+	g.Get(path.Base(uri)).
+		Reply(http.StatusOK)
+
+	// Define request disabling certificate validation
+	req := New(http.MethodGet, uri).SkipCertificateVerification()
+
+	// Execute the request
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestTable(t *testing.T) {
 
 	var testRequests = map[*Request]testCase{
-		New(http.MethodGet, joinURI(endpoint, "simple_ok")): {
+		New(http.MethodGet, joinURI(httpEndpoint, "simple_ok")): {
 			expectedStatusCode: http.StatusOK,
-			responseFn: func(resp *http.Response) error {
-				return nil
+		},
+		New(http.MethodPost, joinURI(httpEndpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+		},
+		New(http.MethodPut, joinURI(httpEndpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+		},
+		New(http.MethodDelete, joinURI(httpEndpoint, "simple_ok")): {
+			expectedStatusCode: http.StatusOK,
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "set_hostname")): {
+			expectedStatusCode: http.StatusOK,
+			hostName:           "api2.example.org",
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "simple_params")): {
+			expectedStatusCode: http.StatusOK,
+			queryParams: map[string]string{
+				"param1": "DPZU3PILpO2vtoe0oRq6",
+				"param2": "NvleFEzAcBzhMhvQSBKB 你好世界 😊😎",
 			},
 		},
-		New(http.MethodPost, joinURI(endpoint, "simple_ok")): {
+		New(http.MethodGet, joinURI(httpEndpoint, "simple_headers")): {
 			expectedStatusCode: http.StatusOK,
-			responseFn: func(resp *http.Response) error {
-				return nil
+			headers: map[string]string{
+				"X-TEST-HEADER-1": "sExavefMTeOVFu6LfLLN",
+				"X-TEST-HEADER-2": "zHW4aaMhMJzrA5eJtahB 你好世界 😊😎",
 			},
 		},
-		New(http.MethodPut, joinURI(endpoint, "simple_ok")): {
+		New(http.MethodGet, joinURI(httpEndpoint, "string_message")): {
 			expectedStatusCode: http.StatusOK,
-			responseFn: func(resp *http.Response) error {
-				return nil
-			},
-		},
-		New(http.MethodDelete, joinURI(endpoint, "simple_ok")): {
-			expectedStatusCode: http.StatusOK,
-			responseFn: func(resp *http.Response) error {
-				return nil
-			},
-		},
-		New(http.MethodGet, joinURI(endpoint, "set_hostname")): {
-			expectedStatusCode: http.StatusOK,
-			responseFn: func(resp *http.Response) error {
-				return nil
-			},
-			hostName: "api2.example.org",
-		},
-		New(http.MethodGet, joinURI(endpoint, "string_message")): {
-			expectedStatusCode: http.StatusOK,
-			body:               []byte("Hello, world! 你好世界 😊😎"),
+			responseBody:       []byte("Hello, world! 你好世界 😊😎"),
 			responseFn: func(resp *http.Response) error {
 				bodyBytes, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
@@ -134,9 +154,19 @@ func TestTable(t *testing.T) {
 				}))
 			}
 
+			// Handle query parameters
+			if len(v.queryParams) > 0 {
+				g.MatchParams(v.queryParams)
+			}
+
+			// Handle headers
+			if len(v.headers) > 0 {
+				g.MatchHeaders(v.headers)
+			}
+
 			// Define the return code (and body, if provided)
-			if v.body != nil {
-				g.Reply(v.expectedStatusCode).Body(bytes.NewBuffer(v.body))
+			if v.responseBody != nil {
+				g.Reply(v.expectedStatusCode).Body(bytes.NewBuffer(v.responseBody))
 			} else {
 				g.Reply(v.expectedStatusCode)
 			}
@@ -144,9 +174,23 @@ func TestTable(t *testing.T) {
 			// Execute and parse the result (if parsing function was provided)
 			req := k.ParseFn(v.responseFn)
 
+			if err := testGetters(req); err != nil {
+				t.Fatalf("Getter validation failed: %s", err)
+			}
+
 			// If a hostname was provided, set it
 			if v.hostName != "" {
 				req.HostName(v.hostName)
+			}
+
+			// Handle query parameters
+			if len(v.queryParams) > 0 {
+				req.QueryParams(v.queryParams)
+			}
+
+			// Handle headers
+			if len(v.headers) > 0 {
+				req.Headers(v.headers)
 			}
 
 			// Execute the request
@@ -155,6 +199,23 @@ func TestTable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testGetters(req *Request) error {
+
+	if req.GetURI() != req.uri {
+		return fmt.Errorf("Unexpected getter URI received")
+	}
+
+	if req.GetMethod() != req.method {
+		return fmt.Errorf("Unexpected getter method received")
+	}
+
+	if !bytes.Equal(req.GetBody(), req.body) {
+		return fmt.Errorf("Unexpected getter body received")
+	}
+
+	return nil
 }
 
 func joinURI(base, suffix string) string {
