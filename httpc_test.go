@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"path"
 	"testing"
 	"time"
 
+	"golang.org/x/net/publicsuffix"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -33,6 +35,18 @@ var (
 	httpEndpoint  = "http://api.example.org"
 	httpsEndpoint = "https://api.example.org"
 )
+
+func TestInvalidRequest(t *testing.T) {
+	if err := New("", "").Run(); err == nil || err.Error() != `Get "": unsupported protocol scheme ""` {
+		t.Fatalf("Unexpected success creating invalid request: %s", err)
+	}
+	if err := New("😊", "").Run(); err == nil || err.Error() != `Error creating request: net/http: invalid method "😊"` {
+		t.Fatalf("Unexpected success creating invalid request: %s", err)
+	}
+	if err := New("", "NOTVALID").Run(); err == nil || err.Error() != `Get "NOTVALID": unsupported protocol scheme ""` {
+		t.Fatalf("Unexpected success creating invalid request: %s", err)
+	}
+}
 
 func TestTimeout(t *testing.T) {
 
@@ -87,7 +101,49 @@ func TestClientDelay(t *testing.T) {
 	if lat := time.Now().Sub(start); lat < 50*time.Millisecond {
 		t.Fatalf("Delayed request unexpectedly too fast, latency %v", lat)
 	}
+}
 
+func TestModifyClient(t *testing.T) {
+
+	uri := joinURI(httpsEndpoint, "client_modification")
+
+	// Set up a mock matcher
+	defer gock.Off()
+
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		t.Fatalf("Failed to set cookie jar")
+	}
+	u, _ := url.Parse(uri)
+	jar.SetCookies(u, []*http.Cookie{
+		{Name: "test_cookie1", Value: "lW9p2ku5iR2OjDHS69xa"},
+		{Name: "test_cookie2", Value: "wBbycTsBM7yGIxURLKSp"},
+	})
+
+	g := gock.New(uri)
+	g.Get(path.Base(uri)).
+		AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
+			if len(arg1.Cookies()) != len(jar.Cookies(u)) {
+				return false, fmt.Errorf("Unexpected number of cookies")
+			}
+			for i, cookie := range arg1.Cookies() {
+				if jar.Cookies(u)[i].String() != cookie.String() {
+					return false, fmt.Errorf("Mismatching cookie, want %s, have %s", jar.Cookies(u)[i].String(), cookie.String())
+				}
+			}
+			return true, nil
+		})).
+		Reply(http.StatusOK)
+
+	// Define request setting custom HTTP client parameters
+	req := New(http.MethodGet, uri).ModifyHTTPClient(func(c *http.Client) {
+		c.Jar = jar
+	})
+
+	// Execute the request
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestSkipCertificateValidation(t *testing.T) {
