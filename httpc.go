@@ -203,9 +203,6 @@ func (r *Request) Run() error {
 	if r.skipCertificateVerification {
 		client = skipTLSVerifyClient
 	}
-	if r.timeout > 0 {
-		client.Timeout = r.timeout
-	}
 	if r.httpClientFunc != nil {
 		r.httpClientFunc(client)
 	}
@@ -240,7 +237,14 @@ func (r *Request) Run() error {
 	}
 
 	// Perform the actual request
-	resp, err := client.Do(req)
+	var resp *http.Response
+	if r.timeout > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
+		defer cancel()
+		resp, err = client.Do(req.WithContext(ctx))
+	} else {
+		resp, err = client.Do(req)
+	}
 	if err != nil {
 		return err
 	}
