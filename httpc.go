@@ -299,8 +299,9 @@ func (r *Request) Run() error {
 ////////////////////////////////////////////////////////////////////////////////
 
 type delayReader struct {
-	delay  time.Duration
-	reader io.Reader
+	delay      time.Duration
+	reader     io.Reader
+	wasDelayed bool
 }
 
 func newDelayedReader(reader io.Reader, delay time.Duration) *delayReader {
@@ -308,7 +309,10 @@ func newDelayedReader(reader io.Reader, delay time.Duration) *delayReader {
 }
 
 func (a *delayReader) Read(p []byte) (int, error) {
-	time.Sleep(a.delay)
+	if !a.wasDelayed {
+		time.Sleep(a.delay)
+		a.wasDelayed = true
+	}
 
 	return a.reader.Read(p)
 }
