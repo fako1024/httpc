@@ -1,5 +1,9 @@
-
 # A simple wrapper around the default Go http client optimized for ease-of-use
+
+[![Github Release](https://img.shields.io/github/release/fako1024/httpc.svg)](https://github.com/fako1024/httpc/releases)
+[![GoDoc](https://godoc.org/github.com/fako1024/httpc?status.svg)](https://godoc.org/github.com/fako1024/httpc/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fako1024/httpc)](https://goreportcard.com/report/github.com/fako1024/httpc)
+[![Build/Test Status](https://github.com/fako1024/httpc/workflows/Go/badge.svg)](https://github.com/fako1024/httpc/actions?query=workflow%3AGo)
 
 This package wraps the Go standard http client, providing a simplified interaction model using method chaining and additional capabilities such as optional in-flow validation against an OpenAPI specification.
 
