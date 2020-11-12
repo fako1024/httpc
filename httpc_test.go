@@ -70,6 +70,27 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+func TestReuse(t *testing.T) {
+
+	uri := joinURI(httpsEndpoint, "reuse")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).
+		Reply(http.StatusOK)
+
+	req := New(http.MethodGet, uri)
+
+	for i := 0; i < 100; i++ {
+
+		// Execute the request
+		if err := req.Run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestClientDelay(t *testing.T) {
 
 	uri := joinURI(httpsEndpoint, "delay")
