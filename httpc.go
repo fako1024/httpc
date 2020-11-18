@@ -236,8 +236,6 @@ func (r *Request) Run() error {
 		}
 	}
 
-	fmt.Println(req)
-
 	// Perform the actual request
 	var resp *http.Response
 	if r.timeout > 0 {
