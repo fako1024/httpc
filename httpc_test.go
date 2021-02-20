@@ -2,11 +2,14 @@ package httpc
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -82,6 +85,9 @@ func TestReuse(t *testing.T) {
 
 	req := New(http.MethodGet, uri)
 
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
 	for i := 0; i < 100; i++ {
 
 		// Execute the request
@@ -112,6 +118,9 @@ func TestClientDelay(t *testing.T) {
 	// Define request disabling certificate validation
 	start := time.Now()
 	req := New(http.MethodGet, uri).Body([]byte(helloWorldString)).Delay(50 * time.Millisecond)
+
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
 
 	// Execute the request
 	if err := req.Run(); err != nil {
@@ -161,6 +170,9 @@ func TestModifyClient(t *testing.T) {
 		c.Jar = jar
 	})
 
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
 	// Execute the request
 	if err := req.Run(); err != nil {
 		t.Fatal(err)
@@ -171,18 +183,113 @@ func TestSkipCertificateValidation(t *testing.T) {
 
 	uri := joinURI(httpsEndpoint, "secure")
 
+	// Define request disabling certificate validation
+	req := New(http.MethodGet, uri).SkipCertificateVerification()
+
 	// Set up a mock matcher
 	defer gock.Off()
 
-	gock.InterceptClient(skipTLSVerifyClient)
-	defer gock.RestoreClient(skipTLSVerifyClient)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
 
 	g := gock.New(uri)
 	g.Get(path.Base(uri)).
 		Reply(http.StatusOK)
 
+	// Execute the request
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInvalidClientCertificates(t *testing.T) {
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificates(nil, nil, nil); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificates([]byte{}, []byte{}, []byte{}); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificates([]byte{0}, []byte{1, 2}, []byte{3, 4, 5}); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles("", "", ""); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+
+	tmpClientCertFile, err := genTempFile([]byte(testClientCert))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpClientCertFile)
+	tmpClientKeyFile, err := genTempFile([]byte(testClientKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpClientKeyFile)
+	tmpCACertFile, err := genTempFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpCACertFile)
+
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles("/tmp/JADGSYDYhsdgayawjdas", "", ""); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles("", "/tmp/JADGSYDYhsdgayawjdas", ""); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles(tmpClientCertFile, "", ""); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles(tmpClientCertFile, tmpClientKeyFile, ""); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles(tmpClientCertFile, tmpClientKeyFile, tmpCACertFile); err == nil {
+		t.Fatal("Unexpected non-nil error")
+	}
+}
+
+func TestClientCertificates(t *testing.T) {
+
+	runDummyTLSServer()
+
 	// Define request disabling certificate validation
-	req := New(http.MethodGet, uri).SkipCertificateVerification()
+	req, err := New(http.MethodGet, "https://127.0.0.1:10001/").SkipCertificateVerification().ClientCertificates([]byte(testClientCert), []byte(testClientKey), []byte(testCACert))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Execute the request
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClientCertificatesFromFiles(t *testing.T) {
+
+	runDummyTLSServer()
+
+	tmpClientCertFile, err := genTempFile([]byte(testClientCert))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpClientCertFile)
+	tmpClientKeyFile, err := genTempFile([]byte(testClientKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpClientKeyFile)
+	tmpCACertFile, err := genTempFile([]byte(testCACert))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpCACertFile)
+
+	// Define request disabling certificate validation
+	req, err := New(http.MethodGet, "https://127.0.0.1:10001/").SkipCertificateVerification().ClientCertificatesFromFiles(tmpClientCertFile, tmpClientKeyFile, tmpCACertFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Execute the request
 	if err := req.Run(); err != nil {
@@ -347,6 +454,9 @@ func runGenericRequest(k *Request, v testCase) error {
 	// Execute and parse the result (if parsing function was provided)
 	req := k.ParseFn(v.responseFn)
 
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
 	if err := testGetters(req); err != nil {
 		return fmt.Errorf("Getter validation failed: %s", err)
 	}
@@ -406,6 +516,9 @@ func testResponseCode(codes []int, returnCode int) error {
 	// Define request disabling certificate validation
 	req := New(http.MethodGet, uri).AcceptedResponseCodes(codes)
 
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
 	// Execute the request
 	return req.Run()
 }
@@ -417,4 +530,65 @@ func joinURI(base, suffix string) string {
 	}
 	u.Path = path.Join(u.Path, suffix)
 	return u.String()
+}
+
+func genTempFile(data []byte) (string, error) {
+
+	tmpfile, err := ioutil.TempFile("", "httpc_test")
+	if err != nil {
+		return "", err
+	}
+	if _, err := tmpfile.Write(data); err != nil {
+		return "", err
+	}
+	if err := tmpfile.Close(); err != nil {
+		return "", err
+	}
+
+	return tmpfile.Name(), nil
+}
+
+func runDummyTLSServer() {
+
+	cert, err := tls.X509KeyPair([]byte(testServerCert), []byte(testServerKey))
+	if err != nil {
+		panic(err)
+	}
+
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		panic(err)
+	}
+	if !caCertPool.AppendCertsFromPEM([]byte(testCACert)) {
+		panic(err)
+	}
+
+	config := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    caCertPool,
+	}
+	ln, err := tls.Listen("tcp", "127.0.0.1:10001", config)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			panic(err)
+		}
+
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+		}
+		err = resp.Write(conn)
+		if err != nil {
+			panic(err)
+		}
+
+		defer ln.Close()
+
+		return
+	}()
 }

@@ -15,7 +15,6 @@ package httpc
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -50,11 +49,11 @@ type Request struct {
 	body        []byte
 	parseFn     func(resp *http.Response) error
 
-	skipCertificateVerification bool
-	openAPIValidationFileData   []byte
-	delay                       time.Duration
+	openAPIValidationFileData []byte
+	delay                     time.Duration
 
 	acceptedResponseCodes []int
+	client                *http.Client
 	httpClientFunc        func(c *http.Client)
 }
 
@@ -66,6 +65,9 @@ func New(method, uri string) *Request {
 		method:                method,
 		uri:                   uri,
 		acceptedResponseCodes: defaultacceptedResponseCodes,
+		client: &http.Client{
+			Transport: defaultTransport.Clone(),
+		},
 	}
 }
 
@@ -98,8 +100,33 @@ func (r *Request) Timeout(timeout time.Duration) *Request {
 
 // SkipCertificateVerification will accept any SSL certificate
 func (r *Request) SkipCertificateVerification() *Request {
-	r.skipCertificateVerification = true
+	r.client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = true
+
 	return r
+}
+
+// ClientCertificates sets client certificates from memory
+func (r *Request) ClientCertificates(clientCert, clientKey, caCert []byte) (*Request, error) {
+
+	tlsConfig, err := setupClientCertificateFromBytes(clientCert, clientKey, caCert, r.client.Transport.(*http.Transport).TLSClientConfig)
+	if err != nil {
+		return r, err
+	}
+
+	r.client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
+
+	return r, nil
+}
+
+// ClientCertificatesFromFiles sets client certificates from files
+func (r *Request) ClientCertificatesFromFiles(certFile, keyFile, caFile string) (*Request, error) {
+
+	clientCert, clientKey, caCert, err := readClientCertificateFiles(certFile, keyFile, caFile)
+	if err != nil {
+		return r, err
+	}
+
+	return r.ClientCertificates(clientCert, clientKey, caCert)
 }
 
 // QueryParams sets the query parameters for the client call
@@ -198,13 +225,8 @@ func (r *Request) Run() error {
 		}
 	}
 
-	// Prepare the HTTP client
-	client := http.DefaultClient
-	if r.skipCertificateVerification {
-		client = skipTLSVerifyClient
-	}
 	if r.httpClientFunc != nil {
-		r.httpClientFunc(client)
+		r.httpClientFunc(r.client)
 	}
 
 	// If an explicit host override was provided it, set it
@@ -241,9 +263,9 @@ func (r *Request) Run() error {
 	if r.timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 		defer cancel()
-		resp, err = client.Do(req.WithContext(ctx))
+		resp, err = r.client.Do(req.WithContext(ctx))
 	} else {
-		resp, err = client.Do(req)
+		resp, err = r.client.Do(req)
 	}
 	if err != nil {
 		return err
@@ -315,14 +337,6 @@ func (a *delayReader) Read(p []byte) (int, error) {
 	}
 
 	return a.reader.Read(p)
-}
-
-var skipTLSVerifyClient = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	},
 }
 
 func isAnyOf(val int, ref []int) bool {
