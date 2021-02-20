@@ -43,7 +43,7 @@ func TestInvalidRequest(t *testing.T) {
 	if err := New("", "").Run(); err == nil || err.Error() != `Get "": unsupported protocol scheme ""` {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
-	if err := New("😊", "").Run(); err == nil || err.Error() != `Error creating request: net/http: invalid method "😊"` {
+	if err := New("😊", "").Run(); err == nil || err.Error() != `error creating request: net/http: invalid method "😊"` {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
 	if err := New("", "NOTVALID").Run(); err == nil || err.Error() != `Get "NOTVALID": unsupported protocol scheme ""` {
@@ -128,7 +128,7 @@ func TestClientDelay(t *testing.T) {
 	}
 
 	// Check the latency of the request
-	if lat := time.Now().Sub(start); lat < 50*time.Millisecond {
+	if lat := time.Since(start); lat < 50*time.Millisecond {
 		t.Fatalf("Delayed request unexpectedly too fast, latency %v", lat)
 	}
 }
@@ -299,7 +299,7 @@ func TestClientCertificatesFromFiles(t *testing.T) {
 
 func TestAcceptedResponseCodes(t *testing.T) {
 
-	if err := testResponseCode([]int{}, http.StatusOK); err == nil || err.Error() != fmt.Sprintf("No accepted HTTP response codes set, considering request to be failed (Got %d)", http.StatusOK) {
+	if err := testResponseCode([]int{}, http.StatusOK); err == nil || err.Error() != fmt.Sprintf("no accepted HTTP response codes set, considering request to be failed (Got %d)", http.StatusOK) {
 		t.Fatalf("Unexpected success for empty accepted response codes")
 	}
 
@@ -587,8 +587,6 @@ func runDummyTLSServer() {
 			panic(err)
 		}
 
-		defer ln.Close()
-
-		return
+		ln.Close()
 	}()
 }

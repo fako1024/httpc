@@ -186,7 +186,7 @@ func (r *Request) Run() error {
 	// Initialize new http.Request
 	req, err := http.NewRequest(r.method, r.uri, nil)
 	if err != nil {
-		return fmt.Errorf("Error creating request: %s", err)
+		return fmt.Errorf("error creating request: %s", err)
 	}
 
 	// Notify the server that the connection should be closed after completion of
@@ -270,7 +270,11 @@ func (r *Request) Run() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Perform validation agaions OpenAPI specification, if requested
 	if r.openAPIValidationFileData != nil {
@@ -298,16 +302,17 @@ func (r *Request) Run() error {
 
 	// Check if the query was successful
 	if len(r.acceptedResponseCodes) == 0 {
-		return fmt.Errorf("No accepted HTTP response codes set, considering request to be failed (Got %d)", resp.StatusCode)
+		return fmt.Errorf("no accepted HTTP response codes set, considering request to be failed (Got %d)", resp.StatusCode)
 	}
 	if !isAnyOf(resp.StatusCode, r.acceptedResponseCodes) {
 
 		// Read the binary data from the response body
 		var extraErr echo.HTTPError
-		jsoniter.NewDecoder(resp.Body).Decode(&extraErr)
-		errStr := fmt.Sprintf("code=%d, message=%v", extraErr.Code, extraErr.Message)
+		if err := jsoniter.NewDecoder(resp.Body).Decode(&extraErr); err != nil {
+			return fmt.Errorf("%s [%.256s]", resp.Status, fmt.Sprintf("code=%d, message=%v", extraErr.Code, extraErr.Message))
+		}
 
-		return fmt.Errorf("%s [%.256s]", resp.Status, errStr)
+		return fmt.Errorf("unknown error occurred")
 	}
 
 	// If a parsing function was provided, execute it
@@ -321,9 +326,9 @@ func (r *Request) Run() error {
 ////////////////////////////////////////////////////////////////////////////////
 
 type delayReader struct {
-	delay      time.Duration
 	reader     io.Reader
 	wasDelayed bool
+	delay      time.Duration
 }
 
 func newDelayedReader(reader io.Reader, delay time.Duration) *delayReader {
