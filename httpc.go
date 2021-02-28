@@ -173,6 +173,13 @@ func (r *Request) ModifyHTTPClient(fn func(c *http.Client)) *Request {
 	return r
 }
 
+// Transport forces a specific transport for the HTTP client (e.g. http.DefaultTransport
+// in order to support standard gock flows)
+func (r *Request) Transport(transport http.RoundTripper) *Request {
+	r.client.Transport = transport
+	return r
+}
+
 // AcceptedResponseCodes defines a set of accepted HTTP response codes for the
 // client call
 func (r *Request) AcceptedResponseCodes(acceptedResponseCodes []int) *Request {
