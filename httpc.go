@@ -48,6 +48,7 @@ type Request struct {
 	headers     Params
 	body        []byte
 	parseFn     func(resp *http.Response) error
+	errorFn     func(resp *http.Response) error
 
 	openAPIValidationFileData []byte
 	delay                     time.Duration
@@ -150,6 +151,12 @@ func (r *Request) Body(body []byte) *Request {
 // ParseFn sets a parsing function for the result of the client call
 func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
 	r.parseFn = parseFn
+	return r
+}
+
+// ErrorFn sets a parsing function for results not handled by ParseFn
+func (r *Request) ErrorFn(errorFn func(resp *http.Response) error) *Request {
+	r.errorFn = errorFn
 	return r
 }
 
@@ -305,6 +312,9 @@ func (r *Request) Run() error {
 		return fmt.Errorf("no accepted HTTP response codes set, considering request to be failed (Got %d)", resp.StatusCode)
 	}
 	if !isAnyOf(resp.StatusCode, r.acceptedResponseCodes) {
+		if r.errorFn != nil {
+			return r.errorFn(resp)
+		}
 
 		// Read the binary data from the response body
 		var extraErr echo.HTTPError

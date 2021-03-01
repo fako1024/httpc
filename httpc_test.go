@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -23,9 +24,12 @@ type testCase struct {
 	requestBody        []byte
 	responseBody       []byte
 	responseFn         func(resp *http.Response) error
+	errorFn            func(resp *http.Response) error
 
 	queryParams Params
 	headers     Params
+
+	expectedError string
 
 	hostName string
 }
@@ -382,12 +386,25 @@ func TestTable(t *testing.T) {
 				return nil
 			},
 		},
+		New(http.MethodGet, joinURI(httpEndpoint, "404_response")): {
+			expectedStatusCode: http.StatusNotFound,
+			expectedError:      "got 404",
+			errorFn: func(resp *http.Response) error {
+				return errors.Errorf("got %d", resp.StatusCode)
+			},
+		},
 	}
 
 	for k, v := range testRequests {
 		t.Run(fmt.Sprintf("%s %s", k.method, k.uri), func(t *testing.T) {
 			if err := runGenericRequest(k, v); err != nil {
-				t.Fatalf("Failed running test: %s", err)
+				if v.expectedError != "" {
+					if v.expectedError != err.Error() {
+						t.Fatalf("error expected %s, got %s", v.expectedError, err.Error())
+					}
+				} else {
+					t.Fatalf("Failed running test: %s", err)
+				}
 			}
 		})
 	}
@@ -453,6 +470,9 @@ func runGenericRequest(k *Request, v testCase) error {
 
 	// Execute and parse the result (if parsing function was provided)
 	req := k.ParseFn(v.responseFn)
+
+	// add errorFn if providedd
+	req = k.ErrorFn(v.errorFn)
 
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
