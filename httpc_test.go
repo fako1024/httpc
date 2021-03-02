@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -390,7 +389,7 @@ func TestTable(t *testing.T) {
 			expectedStatusCode: http.StatusNotFound,
 			expectedError:      "got 404",
 			errorFn: func(resp *http.Response) error {
-				return errors.Errorf("got %d", resp.StatusCode)
+				return fmt.Errorf("got %d", resp.StatusCode)
 			},
 		},
 	}
