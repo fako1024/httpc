@@ -10,4 +10,5 @@ require (
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
 	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
 	gopkg.in/h2non/gock.v1 v1.0.15
+	gopkg.in/yaml.v2 v2.3.0
 )

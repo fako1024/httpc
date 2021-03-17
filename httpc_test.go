@@ -33,8 +33,18 @@ type testCase struct {
 	hostName string
 }
 
+type testStruct struct {
+	Status  int
+	Message string
+}
+
 const (
 	helloWorldString = "Hello, world! 你好世界 😊😎"
+	helloWorldJSON   = `{"status": 200, "message": "Hello, world! 你好世界 😊😎"}`
+	helloWorldYAML   = `---
+status: 200
+message: "Hello, world! 你好世界 \U0001F60A\U0001F60E"
+`
 )
 
 var (
@@ -358,6 +368,7 @@ func TestAcceptedResponseCodes(t *testing.T) {
 
 func TestTable(t *testing.T) {
 
+	var parsedStruct testStruct
 	var testRequests = map[*Request]testCase{
 		New(http.MethodGet, joinURI(httpEndpoint, "simple_ok")): {
 			expectedStatusCode: http.StatusOK,
@@ -406,6 +417,16 @@ func TestTable(t *testing.T) {
 				}
 				return nil
 			},
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "json_response")): {
+			expectedStatusCode: http.StatusOK,
+			responseBody:       []byte(helloWorldJSON),
+			responseFn:         ParseJSON(&parsedStruct),
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "yaml_response")): {
+			expectedStatusCode: http.StatusOK,
+			responseBody:       []byte(helloWorldYAML),
+			responseFn:         ParseYAML(&parsedStruct),
 		},
 		New(http.MethodGet, joinURI(httpEndpoint, "404_response")): {
 			expectedStatusCode: http.StatusNotFound,
