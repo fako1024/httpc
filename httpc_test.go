@@ -368,7 +368,9 @@ func TestAcceptedResponseCodes(t *testing.T) {
 
 func TestTable(t *testing.T) {
 
-	var parsedStruct testStruct
+	var (
+		parsedStruct testStruct
+	)
 	var testRequests = map[*Request]testCase{
 		New(http.MethodGet, joinURI(httpEndpoint, "simple_ok")): {
 			expectedStatusCode: http.StatusOK,
@@ -427,6 +429,20 @@ func TestTable(t *testing.T) {
 			expectedStatusCode: http.StatusOK,
 			responseBody:       []byte(helloWorldYAML),
 			responseFn:         ParseYAML(&parsedStruct),
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "byte_response")): {
+			expectedStatusCode: http.StatusOK,
+			responseBody:       []byte(helloWorldString),
+			responseFn: func(resp *http.Response) error {
+				buf := new(bytes.Buffer)
+				if err := Copy(buf)(resp); err != nil {
+					return err
+				}
+				if buf.String() != helloWorldString {
+					return fmt.Errorf("Unexpected body string: %s", buf.String())
+				}
+				return nil
+			},
 		},
 		New(http.MethodGet, joinURI(httpEndpoint, "404_response")): {
 			expectedStatusCode: http.StatusNotFound,
