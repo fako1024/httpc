@@ -527,10 +527,7 @@ func runGenericRequest(k *Request, v testCase) error {
 	}
 
 	// Execute and parse the result (if parsing function was provided)
-	req := k.ParseFn(v.responseFn)
-
-	// add errorFn if providedd
-	req = k.ErrorFn(v.errorFn)
+	req := k.ParseFn(v.responseFn).ErrorFn(v.errorFn)
 
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)

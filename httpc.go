@@ -23,6 +23,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers/legacy"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo"
 )
@@ -255,9 +256,12 @@ func (r *Request) Run() error {
 		if err != nil {
 			return err
 		}
-		router := openapi3filter.NewRouter().WithSwagger(swaggerFileData)
+		router, err := legacy.NewRouter(swaggerFileData)
+		if err != nil {
+			return err
+		}
 		ctx := context.TODO()
-		route, pathParams, err := router.FindRoute(req.Method, req.URL)
+		route, pathParams, err := router.FindRoute(req)
 		if err != nil {
 			return err
 		}

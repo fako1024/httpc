@@ -3,7 +3,7 @@ module github.com/fako1024/httpc
 go 1.15
 
 require (
-	github.com/getkin/kin-openapi v0.26.0
+	github.com/getkin/kin-openapi v0.53.0
 	github.com/json-iterator/go v1.1.10
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.3.0 // indirect
