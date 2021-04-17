@@ -27,27 +27,34 @@ if err != nil {
 }
 ```
 
-#### Perform HTTPS POST request with a simple body, disabling certificate validation and parsing the response
+#### Perform HTTP GET request and parse the result as JSON into a struct
 ```go
+var res = struct {
+	Status int
+	Message string
+}{}
+err := httpc.New("GET", "http://example.org").
+	ParseFn(httpc.ParseJSON(&res)).
+	Run()
+if err != nil {
+	log.Fatalf("Error performing GET request: %s", err)
+}
+```
+
+#### Perform HTTPS POST request with a simple body, disabling certificate validation and copying the response to a bytes.Buffer
+```go
+buf := new(bytes.Buffer)
 err := httpc.New("POST", "https://example.org").
 	SkipCertificateVerification().
-	Body([]byte{0x1, 0x2}).
-	ParseFn(func(resp *http.Response) error {
+    Body([]byte{0x1, 0x2}).
+    ParseFn(httpc.Copy(buf)).
+	Run()
 
-		// Read the binary data from the response body
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("Failed to read response body: %s", err)
-		}
+if err != nil {
+    log.Fatalf("Error performing POST request: %s", err)
+}
 
-		log.Printf("Read body content: %s\n", string(bodyBytes))
-
-		return nil
-	}).Run()
-
-	if err != nil {
-		log.Fatalf("Error performing POST request: %s", err)
-	}
+fmt.Println(buf.String())
 ```
 
 #### Perform HTTPS GET request (with query parameters + headers), validating request and response against OpenAPIv3 specification

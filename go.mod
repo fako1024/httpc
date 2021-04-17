@@ -1,6 +1,6 @@
 module github.com/fako1024/httpc
 
-go 1.15
+go 1.14
 
 require (
 	github.com/getkin/kin-openapi v0.53.0
