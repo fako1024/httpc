@@ -252,7 +252,7 @@ func (r *Request) Run() error {
 	// Perform validation agaions OpenAPI specification, if requested
 	var requestValidationInput *openapi3filter.RequestValidationInput
 	if r.openAPIValidationFileData != nil {
-		swaggerFileData, err := openapi3.NewSwaggerLoader().LoadSwaggerFromData(r.openAPIValidationFileData)
+		swaggerFileData, err := openapi3.NewLoader().LoadFromData(r.openAPIValidationFileData)
 		if err != nil {
 			return err
 		}
