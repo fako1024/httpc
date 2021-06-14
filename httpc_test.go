@@ -86,6 +86,34 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+func TestModifyRequest(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "modifyRequest")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).
+		MatchHeader("X-TEST", "test").
+		Reply(http.StatusOK)
+
+	t.Run("add-header", func(t *testing.T) {
+		req := New(http.MethodGet, uri).ModifyRequest(func(req *http.Request) error {
+			req.Header.Add("X-TEST", "test")
+			return nil
+		})
+		gock.InterceptClient(req.client)
+		defer gock.RestoreClient(req.client)
+
+		for i := 0; i < 100; i++ {
+			// Execute the request
+			if err := req.Run(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+
+}
+
 func TestReuse(t *testing.T) {
 
 	uri := joinURI(httpsEndpoint, "reuse")

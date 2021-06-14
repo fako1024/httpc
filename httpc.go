@@ -57,6 +57,7 @@ type Request struct {
 	acceptedResponseCodes []int
 	client                *http.Client
 	httpClientFunc        func(c *http.Client)
+	httpRequestFunc       func(c *http.Request) error
 }
 
 // New instantiates a new http client
@@ -181,6 +182,11 @@ func (r *Request) ModifyHTTPClient(fn func(c *http.Client)) *Request {
 	return r
 }
 
+func (r *Request) ModifyRequest(fn func(req *http.Request) error) *Request {
+	r.httpRequestFunc = fn
+	return r
+}
+
 // Transport forces a specific transport for the HTTP client (e.g. http.DefaultTransport
 // in order to support standard gock flows)
 func (r *Request) Transport(transport http.RoundTripper) *Request {
@@ -272,6 +278,14 @@ func (r *Request) Run() error {
 			Route:      route,
 		}
 		if err := openapi3filter.ValidateRequest(ctx, requestValidationInput); err != nil {
+			return err
+		}
+	}
+
+	if r.httpRequestFunc != nil {
+		err := r.httpRequestFunc(req)
+
+		if err != nil {
 			return err
 		}
 	}
