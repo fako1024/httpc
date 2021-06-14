@@ -34,7 +34,7 @@ func setupClientCertificateFromBytes(clientCert, clientKey, caCert []byte, tlsCo
 
 	// Append CA to pool
 	if !tlsConfig.RootCAs.AppendCertsFromPEM(caCert) {
-		return nil, fmt.Errorf("failed to add CA certificate to pool: %s", err)
+		return nil, fmt.Errorf("failed to add CA certificate to pool")
 	}
 
 	// Append client certificate to config
