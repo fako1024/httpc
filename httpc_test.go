@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -76,14 +77,31 @@ func TestTimeout(t *testing.T) {
 	g.Get(path.Base(uri)).
 		Reply(http.StatusOK)
 
-	// Define request with very low timeout (a mocked delay does not trigger
-	// the deadline excess)
-	req := New(http.MethodGet, uri).Timeout(1 * time.Nanosecond)
+	t.Run("with-timeout-method", func(t *testing.T) {
+		// Define request with very low timeout (a mocked delay does not trigger
+		// the deadline excess)
+		req := New(http.MethodGet, uri).Timeout(1 * time.Nanosecond)
 
-	// Execute the request
-	if err := req.Run(); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context deadline exceeded", uri) {
-		t.Fatal(err)
-	}
+		// Execute the request
+		if err := req.Run(); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context deadline exceeded", uri) {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("with-context", func(t *testing.T) {
+		// Only the request, as we are using the context for timeout
+		req := New(http.MethodGet, uri)
+
+		// Define very low timeout (a mocked delay does not trigger
+		// the deadline excess)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		defer cancel()
+
+		// Execute the request
+		if err := req.RunWithContext(ctx); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context deadline exceeded", uri) {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestModifyRequest(t *testing.T) {
@@ -124,18 +142,39 @@ func TestReuse(t *testing.T) {
 	g.Get(path.Base(uri)).
 		Reply(http.StatusOK)
 
-	req := New(http.MethodGet, uri)
+	t.Run("normal", func(t *testing.T) {
+		req := New(http.MethodGet, uri)
 
-	gock.InterceptClient(req.client)
-	defer gock.RestoreClient(req.client)
+		gock.InterceptClient(req.client)
+		defer gock.RestoreClient(req.client)
 
-	for i := 0; i < 100; i++ {
+		for i := 0; i < 100; i++ {
 
-		// Execute the request
-		if err := req.Run(); err != nil {
-			t.Fatal(err)
+			// Execute the request
+			if err := req.Run(); err != nil {
+				t.Fatal(err)
+			}
 		}
-	}
+	})
+
+	t.Run("with-context-timeout", func(t *testing.T) {
+		req := New(http.MethodGet, uri)
+
+		gock.InterceptClient(req.client)
+		defer gock.RestoreClient(req.client)
+
+		for i := 0; i < 100; i++ {
+			func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+				defer cancel()
+
+				// Execute the request
+				if err := req.RunWithContext(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}(t)
+		}
+	})
 }
 
 func TestReuseDefaultTransport(t *testing.T) {
