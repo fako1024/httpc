@@ -57,6 +57,7 @@ type Request struct {
 	acceptedResponseCodes []int
 	client                *http.Client
 	httpClientFunc        func(c *http.Client)
+	httpRequestFunc       func(c *http.Request) error
 }
 
 // New instantiates a new http client
@@ -181,6 +182,11 @@ func (r *Request) ModifyHTTPClient(fn func(c *http.Client)) *Request {
 	return r
 }
 
+func (r *Request) ModifyRequest(fn func(req *http.Request) error) *Request {
+	r.httpRequestFunc = fn
+	return r
+}
+
 // Transport forces a specific transport for the HTTP client (e.g. http.DefaultTransport
 // in order to support standard gock flows)
 func (r *Request) Transport(transport http.RoundTripper) *Request {
@@ -197,9 +203,14 @@ func (r *Request) AcceptedResponseCodes(acceptedResponseCodes []int) *Request {
 
 // Run executes a request
 func (r *Request) Run() error {
+	return r.RunWithContext(context.Background())
+}
+
+// Run executes a request
+func (r *Request) RunWithContext(ctx context.Context) error {
 
 	// Initialize new http.Request
-	req, err := http.NewRequest(r.method, r.uri, nil)
+	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %s", err)
 	}
@@ -260,7 +271,7 @@ func (r *Request) Run() error {
 		if err != nil {
 			return err
 		}
-		ctx := context.TODO()
+
 		route, pathParams, err := router.FindRoute(req)
 		if err != nil {
 			return err
@@ -276,15 +287,24 @@ func (r *Request) Run() error {
 		}
 	}
 
+	if r.httpRequestFunc != nil {
+		err := r.httpRequestFunc(req)
+
+		if err != nil {
+			return err
+		}
+	}
+
 	// Perform the actual request
 	var resp *http.Response
+	timeoutCancel := func() {}
 	if r.timeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
-		defer cancel()
-		resp, err = r.client.Do(req.WithContext(ctx))
-	} else {
-		resp, err = r.client.Do(req)
+		ctx, timeoutCancel = context.WithTimeout(req.Context(), r.timeout)
+		req = req.WithContext(ctx)
 	}
+	resp, err = r.client.Do(req)
+	timeoutCancel()
+
 	if err != nil {
 		return err
 	}
