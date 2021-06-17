@@ -297,13 +297,12 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 
 	// Perform the actual request
 	var resp *http.Response
-	timeoutCancel := func() {}
 	if r.timeout > 0 {
-		ctx, timeoutCancel = context.WithTimeout(req.Context(), r.timeout)
-		req = req.WithContext(ctx)
+		timeoutCtx, timeoutCancel := context.WithTimeout(req.Context(), r.timeout)
+		defer timeoutCancel()
+		req = req.WithContext(timeoutCtx)
 	}
 	resp, err = r.client.Do(req)
-	timeoutCancel()
 
 	if err != nil {
 		return err
