@@ -47,9 +47,12 @@ type Request struct {
 	timeout     time.Duration
 	queryParams Params
 	headers     Params
-	body        []byte
 	parseFn     func(resp *http.Response) error
 	errorFn     func(resp *http.Response) error
+
+	bodyStruct  interface{}
+	bodyEncoder EncoderFn
+	body        []byte
 
 	openAPIValidationFileData []byte
 	delay                     time.Duration
@@ -150,6 +153,13 @@ func (r *Request) Body(body []byte) *Request {
 	return r
 }
 
+// EncodeBody encodes and sets the body for the client call
+func (r *Request) EncodeBody(v interface{}, encoder EncoderFn) *Request {
+	r.bodyStruct = v
+	r.bodyEncoder = encoder
+	return r
+}
+
 // ParseFn sets a parsing function for the result of the client call
 func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
 	r.parseFn = parseFn
@@ -218,6 +228,19 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// Notify the server that the connection should be closed after completion of
 	// the request
 	req.Close = false
+
+	// If requested, parse the requst body from JSON
+	if r.bodyStruct != nil && r.bodyEncoder != nil {
+
+		if len(r.body) > 0 {
+			return fmt.Errorf("cannot use both body encoding and raw body content")
+		}
+
+		r.body, err = r.bodyEncoder(r.bodyStruct)
+		if err != nil {
+			return fmt.Errorf("error encoding body: %s", err)
+		}
+	}
 
 	// If a body was provided, assign it to the request
 	if len(r.body) > 0 {

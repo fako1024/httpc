@@ -14,9 +14,11 @@ import (
 	"testing"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/h2non/gock.v1"
+	"gopkg.in/yaml.v2"
 )
 
 type testCase struct {
@@ -63,6 +65,9 @@ func TestInvalidRequest(t *testing.T) {
 	if err := New("", "NOTVALID").Run(); err == nil || err.Error() != `Get "NOTVALID": unsupported protocol scheme ""` {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
+	if err := New(http.MethodGet, "").EncodeBody(struct{}{}, EncodeJSON).Body([]byte{0}).Run(); err == nil || err.Error() != `cannot use both body encoding and raw body content` {
+		t.Fatalf("Unexpected success creating invalid request: %s", err)
+	}
 }
 
 func TestTimeout(t *testing.T) {
@@ -102,6 +107,84 @@ func TestTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestJSONRequest(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "jsonRequest")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var parsedBody testStruct
+		if err := jsoniter.Unmarshal(bodyBytes, &parsedBody); err != nil {
+			return false, err
+		}
+
+		if parsedBody.Status != 42 || parsedBody.Message != "JSON String" {
+			return false, err
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "JSON String",
+	}
+
+	req := New(http.MethodGet, uri).EncodeBody(reqBody, EncodeJSON)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestYAMLRequest(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "yamlRequest")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var parsedBody testStruct
+		if err := yaml.Unmarshal(bodyBytes, &parsedBody); err != nil {
+			return false, err
+		}
+
+		if parsedBody.Status != 42 || parsedBody.Message != "YAML String" {
+			return false, err
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "YAML String",
+	}
+
+	req := New(http.MethodGet, uri).EncodeBody(reqBody, EncodeYAML)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestModifyRequest(t *testing.T) {

@@ -8,6 +8,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// EncoderFn denotes a generic encoder function / method, usually a Marshal() function
+type EncoderFn func(v interface{}) ([]byte, error)
+
+var (
+
+	// EncodeJSON provides a default function to encode a body to JSON
+	EncodeJSON = jsoniter.Marshal
+
+	// EncodeYAML provides a default function to encode a body to YAML
+	EncodeYAML = yaml.Marshal
+)
+
 // Copy copies the response body into any io.Writer
 func Copy(w io.Writer) func(resp *http.Response) error {
 	return func(resp *http.Response) error {
