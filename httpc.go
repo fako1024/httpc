@@ -208,6 +208,8 @@ func (r *Request) ModifyHTTPClient(fn func(c *http.Client)) *Request {
 	return r
 }
 
+// ModifyRequest allows the caller to call any methods or other functions on the
+// http.Request prior to execution of the call
 func (r *Request) ModifyRequest(fn func(req *http.Request) error) *Request {
 	r.httpRequestFunc = fn
 	return r
@@ -232,7 +234,7 @@ func (r *Request) Run() error {
 	return r.RunWithContext(context.Background())
 }
 
-// Run executes a request
+// RunWithContext executes a request using a specific context
 func (r *Request) RunWithContext(ctx context.Context) error {
 
 	// Initialize new http.Request
