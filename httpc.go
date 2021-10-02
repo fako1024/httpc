@@ -50,8 +50,7 @@ type Request struct {
 	parseFn     func(resp *http.Response) error
 	errorFn     func(resp *http.Response) error
 
-	bodyStruct  interface{}
-	bodyEncoder EncoderFn
+	bodyEncoder Encoder
 	body        []byte
 
 	openAPIValidationFileData []byte
@@ -153,10 +152,21 @@ func (r *Request) Body(body []byte) *Request {
 	return r
 }
 
-// EncodeBody encodes and sets the body for the client call
-func (r *Request) EncodeBody(v interface{}, encoder EncoderFn) *Request {
-	r.bodyStruct = v
+// Encode encodes and sets the body for the client call using an arbitrary encoder
+func (r *Request) Encode(encoder Encoder) *Request {
 	r.bodyEncoder = encoder
+	return r
+}
+
+// EncodeJSON encodes and sets the body for the client call using JSON encoding
+func (r *Request) EncodeJSON(v interface{}) *Request {
+	r.bodyEncoder = JSONEncoder{v}
+	return r
+}
+
+// EncodeYAML encodes and sets the body for the client call using YAML encoding
+func (r *Request) EncodeYAML(v interface{}) *Request {
+	r.bodyEncoder = YAMLEncoder{v}
 	return r
 }
 
@@ -229,17 +239,18 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// the request
 	req.Close = false
 
-	// If requested, parse the requst body from JSON
-	if r.bodyStruct != nil && r.bodyEncoder != nil {
+	// If requested, parse the requst body using the specified encoder
+	if r.bodyEncoder != nil {
 
 		if len(r.body) > 0 {
 			return fmt.Errorf("cannot use both body encoding and raw body content")
 		}
 
-		r.body, err = r.bodyEncoder(r.bodyStruct)
+		r.body, err = r.bodyEncoder.Encode()
 		if err != nil {
 			return fmt.Errorf("error encoding body: %s", err)
 		}
+		req.Header.Add("Content-Type", r.bodyEncoder.ContentType())
 	}
 
 	// If a body was provided, assign it to the request
