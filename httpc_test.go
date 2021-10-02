@@ -51,10 +51,10 @@ status: 200
 message: "Hello, world! 你好世界 \U0001F60A\U0001F60E"
 `
 	helloWorldXML = `<?xml version="1.0" encoding="UTF-8"?>
-<text>
-  <status>200</status>
-  <message>hello world</message>
-</text>
+<testStruct>
+  <Message>Hello, world! 你好世界 😊😎</Message>
+  <Status>200</Status>
+</testStruct>
 `
 )
 
@@ -219,6 +219,28 @@ func TestJSONRequest(t *testing.T) {
 	}
 }
 
+func TestJSONParser(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "jsonParsing")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).Reply(http.StatusOK).Body(bytes.NewBuffer([]byte(helloWorldJSON))).SetHeader("Content-Type", "application/json")
+
+	var parsedResult testStruct
+	req := New(http.MethodGet, uri).ParseJSON(&parsedResult)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if parsedResult.Status != 200 || parsedResult.Message != "Hello, world! 你好世界 😊😎" {
+		t.Fatalf("unexpected content of parsed result: %v", parsedResult)
+	}
+}
+
 func TestYAMLRequest(t *testing.T) {
 	uri := joinURI(httpsEndpoint, "yamlRequest")
 
@@ -263,6 +285,28 @@ func TestYAMLRequest(t *testing.T) {
 	}
 }
 
+func TestYAMLParser(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "yamlParsing")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).Reply(http.StatusOK).Body(bytes.NewBuffer([]byte(helloWorldYAML))).SetHeader("Content-Type", "application/yaml")
+
+	var parsedResult testStruct
+	req := New(http.MethodGet, uri).ParseYAML(&parsedResult)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if parsedResult.Status != 200 || parsedResult.Message != "Hello, world! 你好世界 😊😎" {
+		t.Fatalf("unexpected content of parsed result: %v", parsedResult)
+	}
+}
+
 func TestXMLRequest(t *testing.T) {
 	uri := joinURI(httpsEndpoint, "xmlRequest")
 
@@ -304,6 +348,28 @@ func TestXMLRequest(t *testing.T) {
 
 	if err := req.Run(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestXMLParser(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "xmlParsing")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).Reply(http.StatusOK).Body(bytes.NewBuffer([]byte(helloWorldXML))).SetHeader("Content-Type", "application/xml")
+
+	var parsedResult testStruct
+	req := New(http.MethodGet, uri).ParseXML(&parsedResult)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if parsedResult.Status != 200 || parsedResult.Message != "Hello, world! 你好世界 😊😎" {
+		t.Fatalf("unexpected content of parsed result: %v", parsedResult)
 	}
 }
 

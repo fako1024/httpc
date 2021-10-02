@@ -176,9 +176,27 @@ func (r *Request) EncodeXML(v interface{}) *Request {
 	return r
 }
 
-// ParseFn sets a parsing function for the result of the client call
+// ParseFn sets a generic parsing function for the result of the client call
 func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
 	r.parseFn = parseFn
+	return r
+}
+
+// ParseJSON parses the result of the client call as JSON
+func (r *Request) ParseJSON(v interface{}) *Request {
+	r.parseFn = ParseJSON(v)
+	return r
+}
+
+// ParseYAML parses the result of the client call as YAML
+func (r *Request) ParseYAML(v interface{}) *Request {
+	r.parseFn = ParseYAML(v)
+	return r
+}
+
+// ParseXML parses the result of the client call as XML
+func (r *Request) ParseXML(v interface{}) *Request {
+	r.parseFn = ParseXML(v)
 	return r
 }
 
