@@ -47,9 +47,11 @@ type Request struct {
 	timeout     time.Duration
 	queryParams Params
 	headers     Params
-	body        []byte
 	parseFn     func(resp *http.Response) error
 	errorFn     func(resp *http.Response) error
+
+	bodyEncoder Encoder
+	body        []byte
 
 	openAPIValidationFileData []byte
 	delay                     time.Duration
@@ -150,6 +152,24 @@ func (r *Request) Body(body []byte) *Request {
 	return r
 }
 
+// Encode encodes and sets the body for the client call using an arbitrary encoder
+func (r *Request) Encode(encoder Encoder) *Request {
+	r.bodyEncoder = encoder
+	return r
+}
+
+// EncodeJSON encodes and sets the body for the client call using JSON encoding
+func (r *Request) EncodeJSON(v interface{}) *Request {
+	r.bodyEncoder = JSONEncoder{v}
+	return r
+}
+
+// EncodeYAML encodes and sets the body for the client call using YAML encoding
+func (r *Request) EncodeYAML(v interface{}) *Request {
+	r.bodyEncoder = YAMLEncoder{v}
+	return r
+}
+
 // ParseFn sets a parsing function for the result of the client call
 func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
 	r.parseFn = parseFn
@@ -218,6 +238,20 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// Notify the server that the connection should be closed after completion of
 	// the request
 	req.Close = false
+
+	// If requested, parse the requst body using the specified encoder
+	if r.bodyEncoder != nil {
+
+		if len(r.body) > 0 {
+			return fmt.Errorf("cannot use both body encoding and raw body content")
+		}
+
+		r.body, err = r.bodyEncoder.Encode()
+		if err != nil {
+			return fmt.Errorf("error encoding body: %s", err)
+		}
+		req.Header.Add("Content-Type", r.bodyEncoder.ContentType())
+	}
 
 	// If a body was provided, assign it to the request
 	if len(r.body) > 0 {

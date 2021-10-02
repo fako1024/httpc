@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/gob"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,9 +15,11 @@ import (
 	"testing"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/h2non/gock.v1"
+	"gopkg.in/yaml.v2"
 )
 
 type testCase struct {
@@ -35,8 +38,8 @@ type testCase struct {
 }
 
 type testStruct struct {
-	Status  int
 	Message string
+	Status  int
 }
 
 const (
@@ -61,6 +64,9 @@ func TestInvalidRequest(t *testing.T) {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
 	if err := New("", "NOTVALID").Run(); err == nil || err.Error() != `Get "NOTVALID": unsupported protocol scheme ""` {
+		t.Fatalf("Unexpected success creating invalid request: %s", err)
+	}
+	if err := New(http.MethodGet, "").EncodeJSON(struct{}{}).Body([]byte{0}).Run(); err == nil || err.Error() != `cannot use both body encoding and raw body content` {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
 }
@@ -102,6 +108,152 @@ func TestTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+type gobEncoder struct {
+	v interface{}
+}
+
+// Encode fulfills the Encoder interface, performing the actual encoding
+func (e gobEncoder) Encode() ([]byte, error) {
+	w := new(bytes.Buffer)
+	if err := gob.NewEncoder(w).Encode(e.v); err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
+}
+
+// Encode fulfills the Encoder interface, providing the required content-type header
+func (e gobEncoder) ContentType() string {
+	return "application/custom-type"
+}
+
+func TestGenericEncoding(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "genericEncoding")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+
+		if contentType := r1.Header.Get("Content-Type"); contentType != "application/custom-type" {
+			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+
+		var parsedBody testStruct
+		if err := gob.NewDecoder(r1.Body).Decode(&parsedBody); err != nil {
+			return false, err
+		}
+
+		if parsedBody.Status != 42 || parsedBody.Message != "JSON String" {
+			return false, fmt.Errorf("unexpected content of parsed content: %v", parsedBody)
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "JSON String",
+	}
+
+	req := New(http.MethodGet, uri).Encode(gobEncoder{reqBody})
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJSONRequest(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "jsonRequest")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+
+		if contentType := r1.Header.Get("Content-Type"); contentType != "application/json" {
+			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+
+		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var parsedBody testStruct
+		if err := jsoniter.Unmarshal(bodyBytes, &parsedBody); err != nil {
+			return false, err
+		}
+
+		if parsedBody.Status != 42 || parsedBody.Message != "JSON String" {
+			return false, fmt.Errorf("unexpected content of parsed content: %v", parsedBody)
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "JSON String",
+	}
+
+	req := New(http.MethodGet, uri).EncodeJSON(reqBody)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestYAMLRequest(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "yamlRequest")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+
+		if contentType := r1.Header.Get("Content-Type"); contentType != "application/yaml" {
+			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+
+		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var parsedBody testStruct
+		if err := yaml.Unmarshal(bodyBytes, &parsedBody); err != nil {
+			return false, err
+		}
+
+		if parsedBody.Status != 42 || parsedBody.Message != "YAML String" {
+			return false, fmt.Errorf("unexpected content of parsed content: %v", parsedBody)
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "YAML String",
+	}
+
+	req := New(http.MethodGet, uri).EncodeYAML(reqBody)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestModifyRequest(t *testing.T) {
