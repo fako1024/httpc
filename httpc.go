@@ -170,6 +170,12 @@ func (r *Request) EncodeYAML(v interface{}) *Request {
 	return r
 }
 
+// EncodeXML encodes and sets the body for the client call using XML encoding
+func (r *Request) EncodeXML(v interface{}) *Request {
+	r.bodyEncoder = XMLEncoder{v}
+	return r
+}
+
 // ParseFn sets a parsing function for the result of the client call
 func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
 	r.parseFn = parseFn

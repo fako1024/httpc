@@ -1,6 +1,8 @@
 package httpc
 
 import (
+	"encoding/xml"
+
 	jsoniter "github.com/json-iterator/go"
 	"gopkg.in/yaml.v2"
 )
@@ -43,4 +45,19 @@ func (e YAMLEncoder) Encode() ([]byte, error) {
 // ContentType fulfills the Encoder interface, providing the required content-type header
 func (e YAMLEncoder) ContentType() string {
 	return "application/yaml"
+}
+
+// XMLEncoder provdes encoding to XML
+type XMLEncoder struct {
+	v interface{}
+}
+
+// Encode fulfills the Encoder interface, performing the actual encoding
+func (e XMLEncoder) Encode() ([]byte, error) {
+	return xml.Marshal(e.v)
+}
+
+// ContentType fulfills the Encoder interface, providing the required content-type header
+func (e XMLEncoder) ContentType() string {
+	return "application/xml"
 }

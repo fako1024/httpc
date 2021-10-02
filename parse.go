@@ -1,6 +1,7 @@
 package httpc
 
 import (
+	"encoding/xml"
 	"io"
 	"net/http"
 
@@ -27,5 +28,12 @@ func ParseJSON(v interface{}) func(resp *http.Response) error {
 func ParseYAML(v interface{}) func(resp *http.Response) error {
 	return func(resp *http.Response) error {
 		return yaml.NewDecoder(resp.Body).Decode(v)
+	}
+}
+
+// ParseXML parses the response body as XML into a struct
+func ParseXML(v interface{}) func(resp *http.Response) error {
+	return func(resp *http.Response) error {
+		return xml.NewDecoder(resp.Body).Decode(v)
 	}
 }

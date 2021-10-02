@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/gob"
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -48,6 +49,12 @@ const (
 	helloWorldYAML   = `---
 status: 200
 message: "Hello, world! 你好世界 \U0001F60A\U0001F60E"
+`
+	helloWorldXML = `<?xml version="1.0" encoding="UTF-8"?>
+<text>
+  <status>200</status>
+  <message>hello world</message>
+</text>
 `
 )
 
@@ -248,6 +255,50 @@ func TestYAMLRequest(t *testing.T) {
 	}
 
 	req := New(http.MethodGet, uri).EncodeYAML(reqBody)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestXMLRequest(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "xmlRequest")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+
+		if contentType := r1.Header.Get("Content-Type"); contentType != "application/xml" {
+			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+
+		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var parsedBody testStruct
+		if err := xml.Unmarshal(bodyBytes, &parsedBody); err != nil {
+			return false, err
+		}
+
+		if parsedBody.Status != 42 || parsedBody.Message != "XML String" {
+			return false, fmt.Errorf("unexpected content of parsed content: %v", parsedBody)
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "XML String",
+	}
+
+	req := New(http.MethodGet, uri).EncodeXML(reqBody)
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
@@ -648,6 +699,11 @@ func TestTable(t *testing.T) {
 			expectedStatusCode: http.StatusOK,
 			responseBody:       []byte(helloWorldYAML),
 			responseFn:         ParseYAML(&parsedStruct),
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "xml_response")): {
+			expectedStatusCode: http.StatusOK,
+			responseBody:       []byte(helloWorldXML),
+			responseFn:         ParseXML(&parsedStruct),
 		},
 		New(http.MethodGet, joinURI(httpEndpoint, "byte_response")): {
 			expectedStatusCode: http.StatusOK,
