@@ -380,13 +380,19 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 			return r.errorFn(resp)
 		}
 
-		// Read the binary data from the response body
-		var extraErr echo.HTTPError
-		if err := jsoniter.NewDecoder(resp.Body).Decode(&extraErr); err != nil {
-			return fmt.Errorf("%s [%.256s]", resp.Status, fmt.Sprintf("code=%d, message=%v", extraErr.Code, extraErr.Message))
+		buf := new(bytes.Buffer)
+		if _, err := io.Copy(buf, resp.Body); err != nil {
+			return fmt.Errorf("failed to load body into buffer for error handling: %s", err)
 		}
 
-		return fmt.Errorf("unknown error occurred")
+		// Attempt to decode a generic JSON error from the response body
+		var extraErr echo.HTTPError
+		if err := jsoniter.NewDecoder(bytes.NewReader(buf.Bytes())).Decode(&extraErr); err == nil {
+			return fmt.Errorf("%s [%.512s]", resp.Status, fmt.Sprintf("code=%d, message=%v", extraErr.Code, extraErr.Message))
+		}
+
+		// Attempt to decode the response body directly
+		return fmt.Errorf("%s [body=%.512s]", resp.Status, buf.String())
 	}
 
 	// If a parsing function was provided, execute it

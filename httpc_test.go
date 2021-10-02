@@ -670,6 +670,20 @@ func TestTable(t *testing.T) {
 				return fmt.Errorf("got %d", resp.StatusCode)
 			},
 		},
+		New(http.MethodGet, joinURI(httpEndpoint, "404_response_noFn")): {
+			expectedStatusCode: http.StatusNotFound,
+			expectedError:      "404 Not Found [body=]",
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "401_response_withJSON")): {
+			expectedStatusCode: http.StatusUnauthorized,
+			responseBody:       []byte(`{"code": 401, "message": "no authorization"}`),
+			expectedError:      "401 Unauthorized [code=401, message=no authorization]",
+		},
+		New(http.MethodGet, joinURI(httpEndpoint, "401_response_withBody")).AcceptedResponseCodes([]int{http.StatusNoContent}): {
+			expectedStatusCode: http.StatusUnauthorized,
+			responseBody:       []byte("no authorization"),
+			expectedError:      "401 Unauthorized [body=no authorization]",
+		},
 	}
 
 	for k, v := range testRequests {
