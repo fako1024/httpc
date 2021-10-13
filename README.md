@@ -9,9 +9,10 @@ This package wraps the Go standard http client, providing a simplified interacti
 
 ## Features
 - Simple, method chaining based interface for HTTP client requests
-- Simulation of request delays (optional)
-- Validation of request + response against OpenAPI specification (optional)
+- Simulation of request delays
+- Validation of request + response against OpenAPI specification
 - Customization of HTTP client via functional parameter
+- Back-Off-Retry concept to automatically retry requests if required
 
 ## Installation
 ```bash
