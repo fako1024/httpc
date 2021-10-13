@@ -34,7 +34,7 @@ var res = struct {
 	Message string
 }{}
 err := httpc.New("GET", "http://example.org").
-	ParseFn(httpc.ParseJSON(&res)).
+	ParseJSON(&res).
 	Run()
 if err != nil {
 	log.Fatalf("Error performing GET request: %s", err)
@@ -76,6 +76,6 @@ err = httpc.New("GET", "https://example.org").
 	Run()
 
 if err != nil {
-	log.Fatalf("Error performing POST request: %s", err)
+	log.Fatalf("Error performing GET request: %s", err)
 }
 ```
