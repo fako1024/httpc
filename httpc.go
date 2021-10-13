@@ -37,6 +37,9 @@ var defaultacceptedResponseCodes = []int{
 // Params is an alias for a map of string key / value pairs
 type Params = map[string]string
 
+// Intervals is an alias for a list of durations / time intervals
+type Intervals = []time.Duration
+
 // Request represents a generic web request for quick execution, providing access
 // to method, URL parameters, headers, the body and an optional 1st class function
 // used to parse the result
@@ -55,6 +58,7 @@ type Request struct {
 
 	openAPIValidationFileData []byte
 	delay                     time.Duration
+	retryIntervals            Intervals
 
 	acceptedResponseCodes []int
 	client                *http.Client
@@ -100,6 +104,12 @@ func (r *Request) HostName(host string) *Request {
 // Timeout sets timeout for the client call
 func (r *Request) Timeout(timeout time.Duration) *Request {
 	r.timeout = timeout
+	return r
+}
+
+// RetryBackOff sets back-off intervals and attempts the call multiple times
+func (r *Request) RetryBackOff(intervals Intervals) *Request {
+	r.retryIntervals = intervals
 	return r
 }
 
@@ -362,11 +372,16 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		defer timeoutCancel()
 		req = req.WithContext(timeoutCtx)
 	}
-	resp, err = r.client.Do(req)
 
+	resp, err = r.client.Do(req)
+	for i := 0; err != nil && i < len(r.retryIntervals); i++ {
+		time.Sleep(r.retryIntervals[i])
+		resp, err = r.client.Do(req)
+	}
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
 			err = closeErr
