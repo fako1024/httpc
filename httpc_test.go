@@ -176,6 +176,15 @@ func TestGenericEncoding(t *testing.T) {
 }
 
 func TestJSONRequest(t *testing.T) {
+	t.Run("no_duplicate_header", func(t *testing.T) {
+		testJSONRequest(false, t)
+	})
+	t.Run("duplicate_header", func(t *testing.T) {
+		testJSONRequest(true, t)
+	})
+}
+
+func testJSONRequest(duplicateHeader bool, t *testing.T) {
 	uri := joinURI(httpsEndpoint, "jsonRequest")
 
 	// Set up a mock matcher
@@ -185,6 +194,9 @@ func TestJSONRequest(t *testing.T) {
 
 		if contentType := r1.Header.Get("Content-Type"); contentType != "application/json" {
 			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+		if contentTypeValues := r1.Header.Values("Content-Type"); len(contentTypeValues) != 1 {
+			return false, fmt.Errorf("unexpected content-type values: %s", contentTypeValues)
 		}
 
 		bodyBytes, err := ioutil.ReadAll(r1.Body)
@@ -211,6 +223,11 @@ func TestJSONRequest(t *testing.T) {
 	}
 
 	req := New(http.MethodGet, uri).EncodeJSON(reqBody)
+	if duplicateHeader {
+		req.Headers(Params{
+			"Content-type": "application/json",
+		})
+	}
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
@@ -242,6 +259,15 @@ func TestJSONParser(t *testing.T) {
 }
 
 func TestYAMLRequest(t *testing.T) {
+	t.Run("no_duplicate_header", func(t *testing.T) {
+		testYAMLRequest(false, t)
+	})
+	t.Run("duplicate_header", func(t *testing.T) {
+		testYAMLRequest(true, t)
+	})
+}
+
+func testYAMLRequest(duplicateHeader bool, t *testing.T) {
 	uri := joinURI(httpsEndpoint, "yamlRequest")
 
 	// Set up a mock matcher
@@ -251,6 +277,9 @@ func TestYAMLRequest(t *testing.T) {
 
 		if contentType := r1.Header.Get("Content-Type"); contentType != "application/yaml" {
 			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+		if contentTypeValues := r1.Header.Values("Content-Type"); len(contentTypeValues) != 1 {
+			return false, fmt.Errorf("unexpected content-type values: %s", contentTypeValues)
 		}
 
 		bodyBytes, err := ioutil.ReadAll(r1.Body)
@@ -277,6 +306,11 @@ func TestYAMLRequest(t *testing.T) {
 	}
 
 	req := New(http.MethodGet, uri).EncodeYAML(reqBody)
+	if duplicateHeader {
+		req.Headers(Params{
+			"Content-type": "application/yaml",
+		})
+	}
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
@@ -308,6 +342,15 @@ func TestYAMLParser(t *testing.T) {
 }
 
 func TestXMLRequest(t *testing.T) {
+	t.Run("no_duplicate_header", func(t *testing.T) {
+		testXMLRequest(false, t)
+	})
+	t.Run("duplicate_header", func(t *testing.T) {
+		testXMLRequest(true, t)
+	})
+}
+
+func testXMLRequest(duplicateHeader bool, t *testing.T) {
 	uri := joinURI(httpsEndpoint, "xmlRequest")
 
 	// Set up a mock matcher
@@ -317,6 +360,9 @@ func TestXMLRequest(t *testing.T) {
 
 		if contentType := r1.Header.Get("Content-Type"); contentType != "application/xml" {
 			return false, fmt.Errorf("unexpected content-type: %s", contentType)
+		}
+		if contentTypeValues := r1.Header.Values("Content-Type"); len(contentTypeValues) != 1 {
+			return false, fmt.Errorf("unexpected content-type values: %s", contentTypeValues)
 		}
 
 		bodyBytes, err := ioutil.ReadAll(r1.Body)
@@ -343,6 +389,11 @@ func TestXMLRequest(t *testing.T) {
 	}
 
 	req := New(http.MethodGet, uri).EncodeXML(reqBody)
+	if duplicateHeader {
+		req.Headers(Params{
+			"Content-type": "application/xml",
+		})
+	}
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
