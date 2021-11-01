@@ -117,6 +117,48 @@ func TestTimeout(t *testing.T) {
 	})
 }
 
+func TestRetries(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "retries")
+	intervals := Intervals{10 * time.Millisecond, 15 * time.Millisecond, 20 * time.Millisecond}
+	var sumIntervals time.Duration
+	for i := 0; i < len(intervals); i++ {
+		sumIntervals += intervals[i]
+	}
+
+	// Set up a mock matcher
+	nTries := 0
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+		nTries++
+		if nTries != 4 {
+			return false, nil
+		}
+		return true, nil
+	}).
+		Reply(http.StatusOK)
+
+	req := New(http.MethodGet, uri).RetryBackOff(intervals)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	start := time.Now()
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if timeTaken := time.Since(start); timeTaken < sumIntervals {
+		t.Fatalf("too short duration using Retry(): %v", timeTaken)
+	}
+
+	start = time.Now()
+	if err := New(http.MethodGet, joinURI(httpsEndpoint, "doesnotexist")).RetryBackOff(intervals).Run(); err == nil {
+		t.Fatalf("unexpected success using Retry()")
+	}
+	if timeTaken := time.Since(start); timeTaken < sumIntervals {
+		t.Fatalf("too short duration using Retry(): %v", timeTaken)
+	}
+}
+
 type gobEncoder struct {
 	v interface{}
 }
