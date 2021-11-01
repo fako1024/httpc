@@ -276,7 +276,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error encoding body: %s", err)
 		}
-		req.Header.Add("Content-Type", r.bodyEncoder.ContentType())
+		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
 	}
 
 	// If a body was provided, assign it to the request
@@ -307,7 +307,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// If headers were provided, assign them to the request
 	if r.headers != nil {
 		for key, val := range r.headers {
-			req.Header.Add(key, val)
+			req.Header.Set(key, val)
 		}
 	}
 
