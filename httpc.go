@@ -34,6 +34,10 @@ var defaultacceptedResponseCodes = []int{
 	http.StatusAccepted,
 }
 
+var defaultretryErrFn = func(resp *http.Response, err error) bool {
+	return err != nil
+}
+
 // Params is an alias for a map of string key / value pairs
 type Params = map[string]string
 
@@ -75,9 +79,6 @@ func New(method, uri string) *Request {
 		method:                method,
 		uri:                   uri,
 		acceptedResponseCodes: defaultacceptedResponseCodes,
-		retryErrFn: func(resp *http.Response, err error) bool {
-			return err != nil
-		},
 		client: &http.Client{
 			Transport: defaultTransport.Clone(),
 		},
@@ -361,6 +362,9 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+	if r.retryErrFn == nil {
+		r.retryErrFn = defaultretryErrFn
 	}
 
 	// Perform the actual request
