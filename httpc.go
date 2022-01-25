@@ -75,7 +75,6 @@ type Request struct {
 
 // New instantiates a new http client
 func New(method, uri string) *Request {
-
 	// Instantiate a new NectIdent service using default options
 	return &Request{
 		method:                method,
@@ -136,7 +135,6 @@ func (r *Request) SkipCertificateVerification() *Request {
 
 // ClientCertificates sets client certificates from memory
 func (r *Request) ClientCertificates(clientCert, clientKey, caCert []byte) (*Request, error) {
-
 	tlsConfig, err := setupClientCertificateFromBytes(clientCert, clientKey, caCert, r.client.Transport.(*http.Transport).TLSClientConfig)
 	if err != nil {
 		return r, err
@@ -149,7 +147,6 @@ func (r *Request) ClientCertificates(clientCert, clientKey, caCert []byte) (*Req
 
 // ClientCertificatesFromFiles sets client certificates from files
 func (r *Request) ClientCertificatesFromFiles(certFile, keyFile, caFile string) (*Request, error) {
-
 	clientCert, clientKey, caCert, err := readClientCertificateFiles(certFile, keyFile, caFile)
 	if err != nil {
 		return r, err
@@ -169,7 +166,6 @@ func (r *Request) ClientCertificatesFromInstance(clientCertWithKey tls.Certifica
 	r.client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 
 	return r, nil
-
 }
 
 // QueryParams sets the query parameters for the client call
@@ -292,7 +288,6 @@ func (r *Request) Run() error {
 
 // RunWithContext executes a request using a specific context
 func (r *Request) RunWithContext(ctx context.Context) error {
-
 	// Initialize new http.Request
 	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, nil)
 	if err != nil {

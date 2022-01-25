@@ -15,7 +15,6 @@ var defaultTransport = http.DefaultTransport.(*http.Transport).Clone()
 // setupClientCertificateFromBytes reads the provided client certificate / key and CA certificate
 // from memory and creates / modifies a tls.Config object
 func setupClientCertificateFromBytes(clientCert, clientKey, caCert []byte, tlsConfig *tls.Config) (*tls.Config, error) {
-
 	// Load the key pair
 	clientKeyCert, err := tls.X509KeyPair(clientCert, clientKey)
 	if err != nil {
@@ -51,7 +50,6 @@ func setupClientCertificateFromBytes(clientCert, clientKey, caCert []byte, tlsCo
 // readClientCertificateFiles reads the provided client certificate / key and CA certificate
 // files
 func readClientCertificateFiles(certFile, keyFile, caFile string) ([]byte, []byte, []byte, error) {
-
 	// Read the client certificate / key file
 	clientCert, clientKey, err := readclientKeyCertificate(certFile, keyFile)
 	if err != nil {
@@ -70,7 +68,6 @@ func readClientCertificateFiles(certFile, keyFile, caFile string) ([]byte, []byt
 // readclientKeyCertificate reads both client certificate and key from their
 // respective files
 func readclientKeyCertificate(certFile, keyFile string) ([]byte, []byte, error) {
-
 	// Read the client certificate file
 	clientCert, err := ioutil.ReadFile(filepath.Clean(certFile))
 	if err != nil {
