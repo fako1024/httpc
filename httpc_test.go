@@ -129,7 +129,16 @@ func TestRetries(t *testing.T) {
 	nTries := 0
 	g := gock.New(uri)
 	g.Persist()
-	g.Get(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+	g.Put(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+
+		bodyData, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+		if string(bodyData) != helloWorldString {
+			return false, fmt.Errorf("invalid body on attempt %d: %s", nTries, string(bodyData))
+		}
+
 		nTries++
 		if nTries != 4 {
 			return false, nil
@@ -138,7 +147,7 @@ func TestRetries(t *testing.T) {
 	}).
 		Reply(http.StatusOK)
 
-	req := New(http.MethodGet, uri).RetryBackOff(intervals)
+	req := New(http.MethodPut, uri).RetryBackOff(intervals).Body([]byte(helloWorldString))
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
@@ -151,7 +160,56 @@ func TestRetries(t *testing.T) {
 	}
 
 	start = time.Now()
-	if err := New(http.MethodGet, joinURI(httpsEndpoint, "doesnotexist")).RetryBackOff(intervals).Run(); err == nil {
+	if err := New(http.MethodPut, joinURI(httpsEndpoint, "doesnotexist")).RetryBackOff(intervals).Body([]byte(helloWorldString)).Run(); err == nil {
+		t.Fatalf("unexpected success using Retry()")
+	}
+	if timeTaken := time.Since(start); timeTaken < sumIntervals {
+		t.Fatalf("too short duration using Retry(): %v", timeTaken)
+	}
+}
+
+func TestRetriesErrorFn(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "sdfhgajhdsd")
+	intervals := Intervals{10 * time.Millisecond, 15 * time.Millisecond, 20 * time.Millisecond}
+	var sumIntervals time.Duration
+	for i := 0; i < len(intervals); i++ {
+		sumIntervals += intervals[i]
+	}
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Put(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
+		bodyData, err := ioutil.ReadAll(r1.Body)
+		if err != nil {
+			return false, err
+		}
+		if string(bodyData) != helloWorldString {
+			return false, fmt.Errorf("invalid body: %s", string(bodyData))
+		}
+
+		return true, nil
+	}).
+		Reply(http.StatusBadRequest)
+
+	req := New(http.MethodPut, uri).RetryBackOff(intervals).RetryBackOffErrFn(func(r *http.Response, err error) bool {
+		return err != nil || r.StatusCode == 500
+	}).Body([]byte(helloWorldString))
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	start := time.Now()
+	if err := req.Run(); err == nil || err.Error() != "400 Bad Request [body=]" {
+		t.Fatalf("unexpected error response: %s", err)
+	}
+	if timeTaken := time.Since(start); timeTaken >= sumIntervals {
+		t.Fatalf("too long duration using Retry(): %v", timeTaken)
+	}
+
+	start = time.Now()
+	if err := New(http.MethodPut, joinURI(httpsEndpoint, "doesnotexist")).RetryBackOff(intervals).RetryBackOffErrFn(func(r *http.Response, err error) bool {
+		return err != nil || r.StatusCode == 400
+	}).Body([]byte(helloWorldString)).Run(); err == nil {
 		t.Fatalf("unexpected success using Retry()")
 	}
 	if timeTaken := time.Since(start); timeTaken < sumIntervals {
