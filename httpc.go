@@ -15,6 +15,8 @@ package httpc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -154,6 +156,20 @@ func (r *Request) ClientCertificatesFromFiles(certFile, keyFile, caFile string) 
 	}
 
 	return r.ClientCertificates(clientCert, clientKey, caCert)
+}
+
+// ClientCertificatesFromInstance sets the client certificates from a cert instance
+func (r *Request) ClientCertificatesFromInstance(clientCertWithKey tls.Certificate, caChain []*x509.Certificate) (*Request, error) {
+	tlsConfig, err := setupClientCertificate(clientCertWithKey, caChain, r.client.Transport.(*http.Transport).TLSClientConfig)
+
+	if err != nil {
+		return r, err
+	}
+
+	r.client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
+
+	return r, nil
+
 }
 
 // QueryParams sets the query parameters for the client call

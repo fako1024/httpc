@@ -3,6 +3,7 @@ package httpc
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -79,4 +80,61 @@ func readclientKeyCertificate(certFile, keyFile string) ([]byte, []byte, error) 
 	}
 
 	return clientCert, clientKey, nil
+}
+
+// setupClientCertificate uses the provided tls.Certificate and caCert bytes to create/modify tls.Config
+func setupClientCertificate(clientCertWithKey tls.Certificate, caChain []*x509.Certificate, tlsConfig *tls.Config) (*tls.Config, error) {
+	if clientCertWithKey.PrivateKey == nil {
+		return nil, fmt.Errorf("supplied certificate does not have a private key")
+	}
+
+	if len(caChain) == 0 {
+		return nil, fmt.Errorf("no ca certificate(s) supplied")
+	}
+
+	// If required, instantiate CA certificate pool
+	if tlsConfig == nil || tlsConfig.RootCAs == nil {
+
+		caCertPool, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, fmt.Errorf("failed to obtain system CA pool: %s", err)
+		}
+
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	for _, cert := range caChain {
+		tlsConfig.RootCAs.AddCert(cert)
+	}
+
+	// Append client certificate to config
+	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCertWithKey)
+
+	return tlsConfig, nil
+}
+
+// ParseCAChain takes a file of PEM encoded things and returns the CERTIFICATEs in order
+// taken and adapted from crypto/tls
+func ParseCAChain(caCert []byte) ([]*x509.Certificate, error) {
+	var caChain []*x509.Certificate
+	for len(caCert) > 0 {
+		var block *pem.Block
+		block, caCert = pem.Decode(caCert)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		certBytes := block.Bytes
+		cert, err := x509.ParseCertificate(certBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		caChain = append(caChain, cert)
+	}
+
+	return caChain, nil
 }
