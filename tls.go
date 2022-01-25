@@ -118,6 +118,8 @@ func setupClientCertificate(clientCertWithKey tls.Certificate, caChain []*x509.C
 	return tlsConfig, nil
 }
 
+const pemTypeCertificate = "CERTIFICATE"
+
 // ParseCAChain takes a file of PEM encoded things and returns the CERTIFICATEs in order
 // taken and adapted from crypto/tls
 func ParseCAChain(caCert []byte) ([]*x509.Certificate, error) {
@@ -128,12 +130,11 @@ func ParseCAChain(caCert []byte) ([]*x509.Certificate, error) {
 		if block == nil {
 			break
 		}
-		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+		if block.Type != pemTypeCertificate || len(block.Headers) != 0 {
 			continue
 		}
 
-		certBytes := block.Bytes
-		cert, err := x509.ParseCertificate(certBytes)
+		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			return nil, err
 		}
