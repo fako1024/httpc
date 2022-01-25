@@ -22,8 +22,12 @@ func setupClientCertificateFromBytes(clientCert, clientKey, caCert []byte, tlsCo
 		return nil, fmt.Errorf("failed to load client key / certificate: %s", err)
 	}
 
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	}
+
 	// If required, instantiate CA certificate pool
-	if tlsConfig == nil || tlsConfig.RootCAs == nil {
+	if tlsConfig.RootCAs == nil {
 
 		caCertPool, err := x509.SystemCertPool()
 		if err != nil {
@@ -92,8 +96,12 @@ func setupClientCertificate(clientCertWithKey tls.Certificate, caChain []*x509.C
 		return nil, fmt.Errorf("no ca certificate(s) supplied")
 	}
 
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	}
+
 	// If required, instantiate CA certificate pool
-	if tlsConfig == nil || tlsConfig.RootCAs == nil {
+	if tlsConfig.RootCAs == nil {
 
 		caCertPool, err := x509.SystemCertPool()
 		if err != nil {
