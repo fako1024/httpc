@@ -59,6 +59,7 @@ type Request struct {
 	openAPIValidationFileData []byte
 	delay                     time.Duration
 	retryIntervals            Intervals
+	retryErrFn                func(resp *http.Response, err error) bool
 
 	acceptedResponseCodes []int
 	client                *http.Client
@@ -74,6 +75,9 @@ func New(method, uri string) *Request {
 		method:                method,
 		uri:                   uri,
 		acceptedResponseCodes: defaultacceptedResponseCodes,
+		retryErrFn: func(resp *http.Response, err error) bool {
+			return err != nil
+		},
 		client: &http.Client{
 			Transport: defaultTransport.Clone(),
 		},
@@ -110,6 +114,13 @@ func (r *Request) Timeout(timeout time.Duration) *Request {
 // RetryBackOff sets back-off intervals and attempts the call multiple times
 func (r *Request) RetryBackOff(intervals Intervals) *Request {
 	r.retryIntervals = intervals
+	return r
+}
+
+// RetryBackOffErrFn sets an assessment function to decide wether an error
+// or status code is deemed as a reason to retry the call
+func (r *Request) RetryBackOffErrFn(fn func(resp *http.Response, err error) bool) *Request {
+	r.retryErrFn = fn
 	return r
 }
 
@@ -290,20 +301,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	}
 
 	// If a body was provided, assign it to the request
-	if len(r.body) > 0 {
-
-		// If a delay was requested, assign a delayed reader
-		if r.delay > 0 {
-			req.Body = ioutil.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay))
-		} else {
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(r.body))
-		}
-
-		// Pass content length to enforce non-chunked http request.
-		// Since data is completly in mem it's useless anyways.
-		// Also needed to mitigate a bug in PHP...
-		req.ContentLength = int64(len(r.body))
-	}
+	r.setBody(req)
 
 	// If URL parameters were provided, assign them to the request
 	if r.queryParams != nil {
@@ -374,11 +372,12 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	}
 
 	resp, err = r.client.Do(req)
-	for i := 0; err != nil && i < len(r.retryIntervals); i++ {
+	for i := 0; r.retryErrFn(resp, err) && i < len(r.retryIntervals); i++ {
 		time.Sleep(r.retryIntervals[i])
+		r.setBody(req)
 		resp, err = r.client.Do(req)
 	}
-	if err != nil {
+	if r.retryErrFn(resp, err) {
 		return err
 	}
 
@@ -445,6 +444,23 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+func (r *Request) setBody(req *http.Request) {
+	if len(r.body) > 0 {
+
+		// If a delay was requested, assign a delayed reader
+		if r.delay > 0 {
+			req.Body = ioutil.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay))
+		} else {
+			req.Body = ioutil.NopCloser(bytes.NewBuffer(r.body))
+		}
+
+		// Pass content length to enforce non-chunked http request.
+		// Since data is completly in mem it's useless anyways.
+		// Also needed to mitigate a bug in PHP...
+		req.ContentLength = int64(len(r.body))
+	}
+}
 
 type delayReader struct {
 	reader     io.Reader
