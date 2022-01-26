@@ -585,7 +585,7 @@ func TestReuse(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 
 				// Execute the request
