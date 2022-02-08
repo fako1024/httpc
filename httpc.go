@@ -16,6 +16,7 @@ import (
 	"github.com/getkin/kin-openapi/routers/legacy"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	dac "github.com/xinsnake/go-http-digest-auth-client"
 )
 
 var defaultacceptedResponseCodes = []int{
@@ -59,6 +60,7 @@ type Request struct {
 	client                *http.Client
 	httpClientFunc        func(c *http.Client)
 	httpRequestFunc       func(c *http.Request) error
+	httpAuthFunc          func(c *http.Request)
 }
 
 // New instantiates a new http client
@@ -198,6 +200,21 @@ func (r *Request) EncodeXML(v interface{}) *Request {
 	return r
 }
 
+// AuthBasic sets parameters to perform basic authentication
+func (r *Request) AuthBasic(user, password string) *Request {
+	r.httpAuthFunc = func(c *http.Request) {
+		c.SetBasicAuth(user, password)
+	}
+	return r
+}
+
+// AuthDigest sets parameters to perform digest-based authentication
+func (r *Request) AuthDigest(user, password string) *Request {
+	t := dac.NewTransport(user, password)
+	r.client.Transport = &t
+	return r
+}
+
 // ParseFn sets a generic parsing function for the result of the client call
 func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
 	r.parseFn = parseFn
@@ -276,6 +293,7 @@ func (r *Request) Run() error {
 
 // RunWithContext executes a request using a specific context
 func (r *Request) RunWithContext(ctx context.Context) error {
+
 	// Initialize new http.Request
 	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, nil)
 	if err != nil {
@@ -285,6 +303,11 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// Notify the server that the connection should be closed after completion of
 	// the request
 	req.Close = false
+
+	// If requested, set authentication
+	if r.httpAuthFunc != nil {
+		r.httpAuthFunc(req)
+	}
 
 	// If requested, parse the requst body using the specified encoder
 	if r.bodyEncoder != nil {
