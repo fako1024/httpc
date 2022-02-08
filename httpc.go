@@ -16,7 +16,6 @@ import (
 	"github.com/getkin/kin-openapi/routers/legacy"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo"
-	dac "github.com/xinsnake/go-http-digest-auth-client"
 )
 
 var defaultacceptedResponseCodes = []int{
@@ -205,13 +204,6 @@ func (r *Request) AuthBasic(user, password string) *Request {
 	r.httpAuthFunc = func(c *http.Request) {
 		c.SetBasicAuth(user, password)
 	}
-	return r
-}
-
-// AuthDigest sets parameters to perform digest-based authentication
-func (r *Request) AuthDigest(user, password string) *Request {
-	t := dac.NewTransport(user, password)
-	r.client.Transport = &t
 	return r
 }
 
