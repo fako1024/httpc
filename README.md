@@ -24,7 +24,7 @@ go get -u github.com/fako1024/httpc
 ```go
 err := httpc.New("GET", "http://example.org").Run()
 if err != nil {
-	log.Fatalf("Error performing GET request: %s", err)
+	log.Fatalf("error performing GET request: %s", err)
 }
 ```
 
@@ -38,7 +38,7 @@ err := httpc.New("GET", "http://example.org").
 	ParseJSON(&res).
 	Run()
 if err != nil {
-	log.Fatalf("Error performing GET request: %s", err)
+	log.Fatalf("error performing GET request: %s", err)
 }
 ```
 
@@ -47,18 +47,18 @@ if err != nil {
 buf := new(bytes.Buffer)
 err := httpc.New("POST", "https://example.org").
 	SkipCertificateVerification().
-    Body([]byte{0x1, 0x2}).
-    ParseFn(httpc.Copy(buf)).
+	Body([]byte{0x1, 0x2}).
+	ParseFn(httpc.Copy(buf)).
 	Run()
 
 if err != nil {
-    log.Fatalf("Error performing POST request: %s", err)
+    log.Fatalf("error performing POST request: %s", err)
 }
 
 fmt.Println(buf.String())
 ```
 
-#### Perform HTTPS GET request (with query parameters + headers), validating request and response against OpenAPIv3 specification
+#### Perform HTTPS GET request (with query parameters + headers + basic auth), validating request and response against OpenAPIv3 specification
 ```go
 openAPIFileData, err := ioutil.ReadFile("/tmp/openapi.json")
 if err != nil {
@@ -73,10 +73,11 @@ err = httpc.New("GET", "https://example.org").
 	Headers(httpc.Params{
 		"X-HEADER-TEST": "test",
 	}).
+	AuthBasic("username", "password").
 	OpenAPIValidationFileData(openAPIFileData).
 	Run()
 
 if err != nil {
-	log.Fatalf("Error performing GET request: %s", err)
+	log.Fatalf("error performing GET request: %s", err)
 }
 ```
