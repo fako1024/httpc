@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/gob"
 	"encoding/xml"
 	"fmt"
@@ -524,6 +525,27 @@ func TestXMLParser(t *testing.T) {
 	}
 }
 
+func TestBasicAuth(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "authBasic")
+
+	user, password := "testuser", "testpassword"
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).
+		MatchHeader("Authorization", base64.RawStdEncoding.EncodeToString([]byte(user+":"+password))).
+		Reply(http.StatusOK)
+
+	req := New(http.MethodGet, uri).AuthBasic(user, password)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestModifyRequest(t *testing.T) {
 	uri := joinURI(httpsEndpoint, "modifyRequest")
 
@@ -549,7 +571,6 @@ func TestModifyRequest(t *testing.T) {
 			}
 		}
 	})
-
 }
 
 func TestReuse(t *testing.T) {
