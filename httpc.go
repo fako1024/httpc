@@ -63,9 +63,10 @@ type Request struct {
 }
 
 // New instantiates a new http client
-func New(method, uri string) *Request {
+func New(method, uri string, options ...Option) *Request {
 	// Instantiate a new NectIdent service using default options
-	return &Request{
+
+	r := &Request{
 		method:                method,
 		uri:                   uri,
 		acceptedResponseCodes: defaultacceptedResponseCodes,
@@ -73,6 +74,12 @@ func New(method, uri string) *Request {
 			Transport: defaultTransport.Clone(),
 		},
 	}
+
+	for _, opt := range options {
+		opt(r)
+	}
+
+	return r
 }
 
 // GetMethod returns the method of the request

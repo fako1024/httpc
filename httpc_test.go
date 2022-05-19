@@ -1192,3 +1192,23 @@ func runDummyTLSServer() {
 		ln.Close()
 	}()
 }
+
+func TestInterceptCustomClient(t *testing.T) {
+	cl := &http.Client{}
+
+	testURL := "http://test.host"
+	testPath := "/version"
+	testString := "1.2.3"
+
+	gock.InterceptClient(cl)
+	gock.New(testURL).Get(testPath).Reply(200).BodyString(testString)
+
+	buf := new(bytes.Buffer)
+	err := New(http.MethodGet, testURL+testPath, WithCustomClient(cl)).ParseFn(Copy(buf)).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != testString {
+		t.Fatal("unexpected response")
+	}
+}
