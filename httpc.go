@@ -65,14 +65,24 @@ type Request struct {
 // New instantiates a new http client
 func New(method, uri string) *Request {
 	// Instantiate a new NectIdent service using default options
-	return &Request{
+	return NewWithClient(method, uri, nil)
+}
+
+// NewWithClient instantiates a new httpc request with custom http client
+// This eases testing and client interception
+func NewWithClient(method, uri string, hc *http.Client) *Request {
+	r := &Request{
 		method:                method,
 		uri:                   uri,
 		acceptedResponseCodes: defaultacceptedResponseCodes,
-		client: &http.Client{
-			Transport: defaultTransport.Clone(),
-		},
+		client:                hc,
 	}
+
+	if r.client == nil {
+		r.client = &http.Client{Transport: defaultTransport.Clone()}
+	}
+
+	return r
 }
 
 // GetMethod returns the method of the request

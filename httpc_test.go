@@ -1192,3 +1192,19 @@ func runDummyTLSServer() {
 		ln.Close()
 	}()
 }
+
+func TestNewWithClient(t *testing.T) {
+	testClient := &http.Client{}
+	r := NewWithClient(http.MethodGet, "/test", testClient)
+	if r.client == nil {
+		t.Fatal("client is nil")
+	}
+	if r.client != testClient {
+		t.Fatal("client is != testClient")
+	}
+
+	r = NewWithClient(http.MethodGet, "/test", nil)
+	if r.client == nil {
+		t.Fatal("client is nil")
+	}
+}
