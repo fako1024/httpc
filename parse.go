@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	jsoniter "github.com/json-iterator/go"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Copy copies the response body into any io.Writer

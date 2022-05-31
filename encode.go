@@ -4,7 +4,7 @@ import (
 	"encoding/xml"
 
 	jsoniter "github.com/json-iterator/go"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Encoder denotes a generic encoder, including an encoding function and content-type getter
