@@ -4,6 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/fako1024/httpc?status.svg)](https://godoc.org/github.com/fako1024/httpc/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fako1024/httpc)](https://goreportcard.com/report/github.com/fako1024/httpc)
 [![Build/Test Status](https://github.com/fako1024/httpc/workflows/Go/badge.svg)](https://github.com/fako1024/httpc/actions?query=workflow%3AGo)
+[![CodeQL](https://github.com/fako1024/httpc/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/fako1024/httpc/actions/workflows/codeql-analysis.yml)
 
 This package wraps the Go standard http client, providing a simplified interaction model using method chaining and additional capabilities such as optional in-flow validation against an OpenAPI specification.
 
