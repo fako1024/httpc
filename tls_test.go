@@ -20,7 +20,7 @@ func constructTLSKeys() (tls.Certificate, tls.Certificate, []*x509.Certificate, 
 	}
 
 	// generate CA key
-	caKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 
 	if err != nil {
 		return fail(err)
@@ -56,7 +56,7 @@ func constructTLSKeys() (tls.Certificate, tls.Certificate, []*x509.Certificate, 
 	}
 
 	// generate leaf key
-	leafKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
 
 	if err != nil {
 		return fail(err)
@@ -84,7 +84,7 @@ func constructTLSKeys() (tls.Certificate, tls.Certificate, []*x509.Certificate, 
 	}
 
 	// generate leaf key
-	serverKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
 
 	if err != nil {
 		return fail(err)
@@ -117,12 +117,12 @@ func constructTLSKeys() (tls.Certificate, tls.Certificate, []*x509.Certificate, 
 		Certificate: [][]byte{leafCert},
 		PrivateKey:  leafKey,
 	}
-	serverTlsCert := tls.Certificate{
+	serverTLSCert := tls.Certificate{
 		Certificate: [][]byte{serverCert},
 		PrivateKey:  serverKey,
 	}
 
-	return tlsCert, serverTlsCert, []*x509.Certificate{caCertParsed}, nil
+	return tlsCert, serverTLSCert, []*x509.Certificate{caCertParsed}, nil
 }
 
 func configureTLSServer(serverCertWithKey tls.Certificate, caChain []*x509.Certificate) (net.Listener, chan error, error) {
@@ -140,6 +140,7 @@ func configureTLSServer(serverCertWithKey tls.Certificate, caChain []*x509.Certi
 		Certificates: []tls.Certificate{serverCertWithKey},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    caCertPool,
+		MinVersion:   tls.VersionTLS12,
 	}
 
 	ln, err := tls.Listen("tcp", "127.0.0.1:10002", config)
@@ -182,7 +183,7 @@ func configureTLSServer(serverCertWithKey tls.Certificate, caChain []*x509.Certi
 func TestCertificateInstance(t *testing.T) {
 	r := New(http.MethodGet, "/")
 
-	clientCertKey, serverTlsCert, caChain, err := constructTLSKeys()
+	clientCertKey, serverTLSCert, caChain, err := constructTLSKeys()
 
 	if err != nil {
 		t.Fatal(err)
@@ -194,17 +195,17 @@ func TestCertificateInstance(t *testing.T) {
 		t.Error(err)
 	}
 
-	ln, respChan, err := configureTLSServer(serverTlsCert, caChain)
-
+	ln, respChan, err := configureTLSServer(serverTLSCert, caChain)
 	if err != nil {
 		t.Error(err)
 	}
 
-	defer ln.Close()
+	defer func() {
+		if cerr := ln.Close(); err != nil {
+			t.Fatal(cerr)
+		}
+	}()
 
-	if err != nil {
-		t.Fatal(err)
-	}
 	// Define request disabling certificate validation
 	req, err := New(http.MethodGet, "https://127.0.0.1:10002/").ClientCertificatesFromInstance(clientCertKey, caChain)
 	if err != nil {

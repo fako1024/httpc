@@ -299,7 +299,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// Initialize new http.Request
 	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, nil)
 	if err != nil {
-		return fmt.Errorf("error creating request: %s", err)
+		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	// Notify the server that the connection should be closed after completion of
@@ -320,7 +320,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 
 		r.body, err = r.bodyEncoder.Encode()
 		if err != nil {
-			return fmt.Errorf("error encoding body: %s", err)
+			return fmt.Errorf("error encoding body: %w", err)
 		}
 		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
 	}
@@ -450,7 +450,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 
 		buf := new(bytes.Buffer)
 		if _, err := io.Copy(buf, resp.Body); err != nil {
-			return fmt.Errorf("failed to load body into buffer for error handling: %s", err)
+			return fmt.Errorf("failed to load body into buffer for error handling: %w", err)
 		}
 
 		// Attempt to decode a generic JSON error from the response body

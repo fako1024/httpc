@@ -18,11 +18,13 @@ func setupClientCertificateFromBytes(clientCert, clientKey, caCert []byte, tlsCo
 	// Load the key pair
 	clientKeyCert, err := tls.X509KeyPair(clientCert, clientKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load client key / certificate: %s", err)
+		return nil, fmt.Errorf("failed to load client key / certificate: %w", err)
 	}
 
 	if tlsConfig == nil {
-		tlsConfig = &tls.Config{}
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
 	}
 
 	// If required, instantiate CA certificate pool
@@ -30,7 +32,7 @@ func setupClientCertificateFromBytes(clientCert, clientKey, caCert []byte, tlsCo
 
 		caCertPool, err := x509.SystemCertPool()
 		if err != nil {
-			return nil, fmt.Errorf("failed to obtain system CA pool: %s", err)
+			return nil, fmt.Errorf("failed to obtain system CA pool: %w", err)
 		}
 
 		tlsConfig.RootCAs = caCertPool
@@ -53,13 +55,13 @@ func readClientCertificateFiles(certFile, keyFile, caFile string) ([]byte, []byt
 	// Read the client certificate / key file
 	clientCert, clientKey, err := readclientKeyCertificate(certFile, keyFile)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to read / decode client key / certificate file: %s", err)
+		return nil, nil, nil, fmt.Errorf("failed to read / decode client key / certificate file: %w", err)
 	}
 
 	// Read CA certificate from file
 	caCert, err := ioutil.ReadFile(filepath.Clean(caFile))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to read CA certificate: %s", err)
+		return nil, nil, nil, fmt.Errorf("failed to read CA certificate: %w", err)
 	}
 
 	return clientCert, clientKey, caCert, nil
@@ -94,15 +96,16 @@ func setupClientCertificate(clientCertWithKey tls.Certificate, caChain []*x509.C
 	}
 
 	if tlsConfig == nil {
-		tlsConfig = &tls.Config{}
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
 	}
 
 	// If required, instantiate CA certificate pool
 	if tlsConfig.RootCAs == nil {
-
 		caCertPool, err := x509.SystemCertPool()
 		if err != nil {
-			return nil, fmt.Errorf("failed to obtain system CA pool: %s", err)
+			return nil, fmt.Errorf("failed to obtain system CA pool: %w", err)
 		}
 
 		tlsConfig.RootCAs = caCertPool

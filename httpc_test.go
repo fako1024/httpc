@@ -354,7 +354,7 @@ func TestJSONParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if parsedResult.Status != 200 || parsedResult.Message != "Hello, world! 你好世界 😊😎" {
+	if parsedResult.Status != 200 || parsedResult.Message != helloWorldString {
 		t.Fatalf("unexpected content of parsed result: %v", parsedResult)
 	}
 }
@@ -763,17 +763,29 @@ func TestInvalidClientCertificates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpClientCertFile)
+	defer func() {
+		if rerr := os.Remove(tmpClientCertFile); rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
 	tmpClientKeyFile, err := genTempFile([]byte(testClientKey))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpClientKeyFile)
+	defer func() {
+		if rerr := os.Remove(tmpClientKeyFile); rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
 	tmpCACertFile, err := genTempFile([]byte{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpCACertFile)
+	defer func() {
+		if rerr := os.Remove(tmpCACertFile); rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
 
 	if _, err := New(http.MethodGet, "https://127.0.0.1:10001/").ClientCertificatesFromFiles("/tmp/JADGSYDYhsdgayawjdas", "", ""); err == nil {
 		t.Fatal("Unexpected non-nil error")
@@ -816,17 +828,29 @@ func TestClientCertificatesFromFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpClientCertFile)
+	defer func() {
+		if rerr := os.Remove(tmpClientCertFile); rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
 	tmpClientKeyFile, err := genTempFile([]byte(testClientKey))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpClientKeyFile)
+	defer func() {
+		if rerr := os.Remove(tmpClientKeyFile); rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
 	tmpCACertFile, err := genTempFile([]byte(testCACert))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpCACertFile)
+	defer func() {
+		if rerr := os.Remove(tmpCACertFile); rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
 
 	// Define request disabling certificate validation
 	req, err := New(http.MethodGet, "https://127.0.0.1:10001/").SkipCertificateVerification().ClientCertificatesFromFiles(tmpClientCertFile, tmpClientKeyFile, tmpCACertFile)
@@ -923,7 +947,7 @@ func TestTable(t *testing.T) {
 					return err
 				}
 				if string(bodyBytes) != helloWorldString {
-					return fmt.Errorf("Unexpected response body string, want `Hello, world! 你好世界 😊😎`, have `%s`", string(bodyBytes))
+					return fmt.Errorf("Unexpected response body string, want `%s`, have `%s`", helloWorldString, string(bodyBytes))
 				}
 				return nil
 			},
@@ -1060,7 +1084,7 @@ func runGenericRequest(k *Request, v testCase) error {
 	defer gock.RestoreClient(req.client)
 
 	if err := testGetters(req); err != nil {
-		return fmt.Errorf("Getter validation failed: %s", err)
+		return fmt.Errorf("Getter validation failed: %w", err)
 	}
 
 	// If a hostname was provided, set it
@@ -1169,6 +1193,7 @@ func runDummyTLSServer() {
 		Certificates: []tls.Certificate{cert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    caCertPool,
+		MinVersion:   tls.VersionTLS12,
 	}
 	ln, err := tls.Listen("tcp", "127.0.0.1:10001", config)
 	if err != nil {
@@ -1189,7 +1214,9 @@ func runDummyTLSServer() {
 			panic(err)
 		}
 
-		ln.Close()
+		if err := ln.Close(); err != nil {
+			panic(err)
+		}
 	}()
 }
 
