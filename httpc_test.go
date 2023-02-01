@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -84,17 +85,18 @@ func TestTimeout(t *testing.T) {
 	// Define a URI that safely won't exist on localhost
 	uri := "http://127.0.0.1/uiatbucacajdahgsdkjasdgcagagd/timeout"
 
-	// Set up a mock matcher
-	defer gock.Off()
-	defer gock.DisableNetworking()
-	g := gock.New(uri).EnableNetworking()
-	g.Get(path.Base(uri)).
-		Reply(http.StatusOK)
-
 	t.Run("with-timeout-method", func(t *testing.T) {
+
 		// Define request with very low timeout (a mocked delay does not trigger
 		// the deadline excess)
-		req := New(http.MethodGet, uri).Timeout(1 * time.Nanosecond)
+		req := NewWithClient(http.MethodGet, uri, &http.Client{
+			Transport: &http.Transport{
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+			}}).Timeout(time.Nanosecond)
 
 		// Execute the request
 		if err := req.Run(); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context deadline exceeded", uri) {
@@ -103,8 +105,16 @@ func TestTimeout(t *testing.T) {
 	})
 
 	t.Run("with-context", func(t *testing.T) {
+
 		// Only the request, as we are using the context for timeout
-		req := New(http.MethodGet, uri)
+		req := NewWithClient(http.MethodGet, uri, &http.Client{
+			Transport: &http.Transport{
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+			}})
 
 		// Define very low timeout (a mocked delay does not trigger
 		// the deadline excess)
