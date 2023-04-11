@@ -556,6 +556,48 @@ func TestBasicAuth(t *testing.T) {
 	}
 }
 
+func TestBearerAuth(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "authBearer")
+
+	token := "testtoken"
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).
+		MatchHeader("Authorization", fmt.Sprintf("Bearer %s", token)).
+		Reply(http.StatusOK)
+
+	req := New(http.MethodGet, uri).AuthBearer(token)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTokenAuth(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "authToken")
+
+	prefix, token := "testprefix", "testtoken"
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Persist()
+	g.Get(path.Base(uri)).
+		MatchHeader("Authorization", fmt.Sprintf("%s %s", prefix, token)).
+		Reply(http.StatusOK)
+
+	req := New(http.MethodGet, uri).AuthToken(prefix, token)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestModifyRequest(t *testing.T) {
 	uri := joinURI(httpsEndpoint, "modifyRequest")
 
