@@ -158,7 +158,14 @@ func TestRetries(t *testing.T) {
 	}).
 		Reply(http.StatusOK)
 
-	req := New(http.MethodPut, uri).RetryBackOff(intervals).Body([]byte(helloWorldString))
+	retryResponses, retryErrs := make([]*http.Response, 0), make([]error, 0)
+	req := New(http.MethodPut, uri).
+		RetryBackOff(intervals).
+		RetryEventFn(func(i int, r *http.Response, err error) {
+			retryResponses = append(retryResponses, r)
+			retryErrs = append(retryErrs, err)
+		}).
+		Body([]byte(helloWorldString))
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
@@ -176,6 +183,12 @@ func TestRetries(t *testing.T) {
 	}
 	if timeTaken := time.Since(start); timeTaken < sumIntervals {
 		t.Fatalf("too short duration using Retry(): %v", timeTaken)
+	}
+	if len(retryResponses) != len(intervals) {
+		t.Fatalf("unexpected number of retry event handler responses (want %d, have %d)", len(intervals), len(retryResponses))
+	}
+	if len(retryErrs) != len(intervals) {
+		t.Fatalf("unexpected number of retry event handler errors (want %d, have %d)", len(intervals), len(retryErrs))
 	}
 }
 
@@ -203,9 +216,13 @@ func TestRetriesErrorFn(t *testing.T) {
 	}).
 		Reply(http.StatusBadRequest)
 
-	req := New(http.MethodPut, uri).RetryBackOff(intervals).RetryBackOffErrFn(func(r *http.Response, err error) bool {
-		return err != nil || r.StatusCode == 500
-	}).Body([]byte(helloWorldString))
+	retryResponses, retryErrs := make([]*http.Response, 0), make([]error, 0)
+	req := New(http.MethodPut, uri).
+		RetryBackOff(intervals).
+		RetryBackOffErrFn(func(r *http.Response, err error) bool {
+			return err != nil || r.StatusCode == 500
+		}).
+		Body([]byte(helloWorldString))
 	gock.InterceptClient(req.client)
 	defer gock.RestoreClient(req.client)
 
@@ -218,13 +235,26 @@ func TestRetriesErrorFn(t *testing.T) {
 	}
 
 	start = time.Now()
-	if err := New(http.MethodPut, joinURI(httpsEndpoint, "doesnotexist")).RetryBackOff(intervals).RetryBackOffErrFn(func(r *http.Response, err error) bool {
-		return err != nil || r.StatusCode == 400
-	}).Body([]byte(helloWorldString)).Run(); err == nil {
+	if err := New(http.MethodPut, joinURI(httpsEndpoint, "doesnotexist")).
+		RetryBackOff(intervals).
+		RetryEventFn(func(i int, r *http.Response, err error) {
+			retryResponses = append(retryResponses, r)
+			retryErrs = append(retryErrs, err)
+		}).
+		RetryBackOffErrFn(func(r *http.Response, err error) bool {
+			return err != nil || r.StatusCode == 400
+		}).
+		Body([]byte(helloWorldString)).Run(); err == nil {
 		t.Fatalf("unexpected success using Retry()")
 	}
 	if timeTaken := time.Since(start); timeTaken < sumIntervals {
 		t.Fatalf("too short duration using Retry(): %v", timeTaken)
+	}
+	if len(retryResponses) != len(intervals) {
+		t.Fatalf("unexpected number of retry event handler responses (want %d, have %d)", len(intervals), len(retryResponses))
+	}
+	if len(retryErrs) != len(intervals) {
+		t.Fatalf("unexpected number of retry event handler errors (want %d, have %d)", len(intervals), len(retryErrs))
 	}
 }
 
