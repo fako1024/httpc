@@ -54,6 +54,7 @@ type Request struct {
 	delay                     time.Duration
 	retryIntervals            Intervals
 	retryErrFn                func(resp *http.Response, err error) bool
+	retryEventFn              func(attempt int, resp *http.Response, err error)
 
 	acceptedResponseCodes []int
 	client                *http.Client
@@ -119,9 +120,20 @@ func (r *Request) RetryBackOff(intervals Intervals) *Request {
 }
 
 // RetryBackOffErrFn sets an assessment function to decide wether an error
-// or status code is deemed as a reason to retry the call
-func (r *Request) RetryBackOffErrFn(fn func(resp *http.Response, err error) bool) *Request {
+// or status code is deemed as a reason to retry the call.
+// Note: both the response and the error may be nil (depending on the reason for the retry)
+// so proper checks must be ensured
+func (r *Request) RetryBackOffErrFn(fn func(*http.Response, error) bool) *Request {
 	r.retryErrFn = fn
+	return r
+}
+
+// RetryEventFn sets an event handler / function that gets triggered upon a retry, providing
+// the HTTP response and error that causes the retry.
+// Note: both the response and the error may be nil (depending on the reason for the retry)
+// so proper checks must be ensured
+func (r *Request) RetryEventFn(fn func(int, *http.Response, error)) *Request {
+	r.retryEventFn = fn
 	return r
 }
 
@@ -210,7 +222,7 @@ func (r *Request) EncodeXML(v interface{}) *Request {
 }
 
 // ParseFn sets a generic parsing function for the result of the client call
-func (r *Request) ParseFn(parseFn func(resp *http.Response) error) *Request {
+func (r *Request) ParseFn(parseFn func(*http.Response) error) *Request {
 	r.parseFn = parseFn
 	return r
 }
@@ -234,7 +246,7 @@ func (r *Request) ParseXML(v interface{}) *Request {
 }
 
 // ErrorFn sets a parsing function for results not handled by ParseFn
-func (r *Request) ErrorFn(errorFn func(resp *http.Response) error) *Request {
+func (r *Request) ErrorFn(errorFn func(*http.Response) error) *Request {
 	r.errorFn = errorFn
 	return r
 }
@@ -254,14 +266,14 @@ func (r *Request) Delay(delay time.Duration) *Request {
 
 // ModifyHTTPClient executes any function / allows setting parameters of the
 // underlying HTTP client before the actual request is made
-func (r *Request) ModifyHTTPClient(fn func(c *http.Client)) *Request {
+func (r *Request) ModifyHTTPClient(fn func(*http.Client)) *Request {
 	r.httpClientFunc = fn
 	return r
 }
 
 // ModifyRequest allows the caller to call any methods or other functions on the
 // http.Request prior to execution of the call
-func (r *Request) ModifyRequest(fn func(req *http.Request) error) *Request {
+func (r *Request) ModifyRequest(fn func(*http.Request) error) *Request {
 	r.httpRequestFunc = fn
 	return r
 }
@@ -393,6 +405,12 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 
 	resp, err = r.client.Do(req)
 	for i := 0; r.retryErrFn(resp, err) && i < len(r.retryIntervals); i++ {
+
+		// If a retry event handler exists, trigger it
+		if r.retryEventFn != nil {
+			r.retryEventFn(i+1, resp, err)
+		}
+
 		time.Sleep(r.retryIntervals[i])
 		r.setBody(req)
 		resp, err = r.client.Do(req)
