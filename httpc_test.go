@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 	"time"
 
@@ -85,6 +86,15 @@ func TestTimeout(t *testing.T) {
 	// Define a URI that safely won't exist on localhost
 	uri := "http://127.0.0.1/uiatbucacajdahgsdkjasdgcagagd/timeout"
 
+	// Apparently Windows has an issue with handling the context with very short timeouts, sporadically
+	// yielding an i/o timeout error at the dial stage instead of the expected "context deadline exceeded"
+	// Only workaround so far is to slightly increase the timeout value.
+	// See https://github.com/fako1024/httpc/issues/22
+	testTimeout := time.Nanosecond
+	if runtime.GOOS == "windows" {
+		testTimeout = 100 * time.Millisecond
+	}
+
 	t.Run("with-timeout-method", func(t *testing.T) {
 
 		// Define request with very low timeout (a mocked delay does not trigger
@@ -96,7 +106,7 @@ func TestTimeout(t *testing.T) {
 					Timeout:   10 * time.Second,
 					KeepAlive: 30 * time.Second,
 				}).DialContext,
-			}}).Timeout(time.Nanosecond)
+			}}).Timeout(testTimeout)
 
 		// Execute the request
 		if err := req.Run(); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context deadline exceeded", uri) {
@@ -118,7 +128,7 @@ func TestTimeout(t *testing.T) {
 
 		// Define very low timeout (a mocked delay does not trigger
 		// the deadline excess)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 		defer cancel()
 
 		// Execute the request
