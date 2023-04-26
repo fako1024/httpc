@@ -138,6 +138,26 @@ func TestTimeout(t *testing.T) {
 	})
 }
 
+func TestRetryInvalidOptions(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "invalidretries")
+	if err := New(http.MethodPut, uri).
+		RetryBackOffErrFn(func(r *http.Response, err error) bool { return true }).
+		Body([]byte(helloWorldString)).Run(); err == nil || err.Error() != "cannot use RetryBackOffErrFn() [used: true] / RetryEventFn() [used: false] without providing intervals via RetryBackOff()" {
+		t.Fatal(err)
+	}
+	if err := New(http.MethodPut, uri).
+		RetryEventFn(func(i int, r *http.Response, err error) {}).
+		Body([]byte(helloWorldString)).Run(); err == nil || err.Error() != "cannot use RetryBackOffErrFn() [used: false] / RetryEventFn() [used: true] without providing intervals via RetryBackOff()" {
+		t.Fatal(err)
+	}
+	if err := New(http.MethodPut, uri).
+		RetryBackOffErrFn(func(r *http.Response, err error) bool { return true }).
+		RetryEventFn(func(i int, r *http.Response, err error) {}).
+		Body([]byte(helloWorldString)).Run(); err == nil || err.Error() != "cannot use RetryBackOffErrFn() [used: true] / RetryEventFn() [used: true] without providing intervals via RetryBackOff()" {
+		t.Fatal(err)
+	}
+}
+
 func TestRetries(t *testing.T) {
 	uri := joinURI(httpsEndpoint, "retries")
 	intervals := Intervals{10 * time.Millisecond, 15 * time.Millisecond, 20 * time.Millisecond}

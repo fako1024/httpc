@@ -24,7 +24,7 @@ var defaultacceptedResponseCodes = []int{
 	http.StatusAccepted,
 }
 
-var defaultretryErrFn = func(resp *http.Response, err error) bool {
+var defaultRetryErrFn = func(resp *http.Response, err error) bool {
 	return err != nil
 }
 
@@ -179,19 +179,22 @@ func (r *Request) ClientCertificatesFromInstance(clientCertWithKey tls.Certifica
 	return r, nil
 }
 
-// QueryParams sets the query parameters for the client call
+// QueryParams sets the URL / query parameters for the client call
+// Note: Any existing URL / query parameters are overwritten / removed
 func (r *Request) QueryParams(queryParams Params) *Request {
 	r.queryParams = queryParams
 	return r
 }
 
 // Headers sets the headers for the client call
+// Note: Any existing headers are overwritten / removed
 func (r *Request) Headers(headers Params) *Request {
 	r.headers = headers
 	return r
 }
 
 // Body sets the body for the client call
+// Note: Any existing body is overwritten
 func (r *Request) Body(body []byte) *Request {
 	r.body = body
 	return r
@@ -391,8 +394,11 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 			return err
 		}
 	}
-	if r.retryErrFn == nil {
-		r.retryErrFn = defaultretryErrFn
+
+	// Handle retry options / parameter
+	retryErrFn, err := r.setRetryHandling()
+	if err != nil {
+		return err
 	}
 
 	// Perform the actual request
@@ -404,7 +410,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	}
 
 	resp, err = r.client.Do(req)
-	for i := 0; r.retryErrFn(resp, err) && i < len(r.retryIntervals); i++ {
+	for i := 0; retryErrFn(resp, err) && i < len(r.retryIntervals); i++ {
 
 		// If a retry event handler exists, trigger it
 		if r.retryEventFn != nil {
@@ -415,7 +421,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		r.setBody(req)
 		resp, err = r.client.Do(req)
 	}
-	if r.retryErrFn(resp, err) {
+	if retryErrFn(resp, err) {
 		return err
 	}
 
@@ -482,6 +488,26 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+func (r *Request) setRetryHandling() (func(resp *http.Response, err error) bool, error) {
+
+	// Check if provided parameters / options are consistent
+	if len(r.retryIntervals) == 0 {
+		if r.retryErrFn != nil || r.retryEventFn != nil {
+			return nil, fmt.Errorf("cannot use RetryBackOffErrFn() [used: %v] / RetryEventFn() [used: %v] without providing intervals via RetryBackOff()",
+				r.retryErrFn != nil,
+				r.retryEventFn != nil)
+		}
+	}
+
+	// Set retry / back-off function to use
+	retryErrFn := defaultRetryErrFn
+	if r.retryErrFn != nil {
+		retryErrFn = r.retryErrFn
+	}
+
+	return retryErrFn, nil
+}
 
 func (r *Request) setBody(req *http.Request) {
 	if len(r.body) > 0 {
