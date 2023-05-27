@@ -417,7 +417,16 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 			r.retryEventFn(i+1, resp, err)
 		}
 
-		time.Sleep(r.retryIntervals[i])
+		// Wait until the retry inteval has elapsed or the context was cancelled
+		// In both cases simply continue and have the client handle the (potentially
+		// cancelled) context (that way the same error is returned no matter _when_
+		// the context was cancelled)
+		ticker := time.NewTicker(r.retryIntervals[i])
+		select {
+		case <-ctx.Done():
+		case <-ticker.C:
+		}
+
 		r.setBody(req)
 		resp, err = r.client.Do(req)
 	}

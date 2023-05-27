@@ -138,6 +138,36 @@ func TestTimeout(t *testing.T) {
 	})
 }
 
+func TestCancelContext(t *testing.T) {
+
+	// Define a URI that safely won't exist on localhost
+	uri := "http://127.0.0.1/uiatbucacajdahgsdkjasdgcagagd/cancelcontext"
+
+	// Only the request, as we are using the context for timeout
+	req := New(http.MethodGet, uri).RetryBackOff(Intervals{
+		5 * time.Second,
+	})
+
+	// Define very low timeout (a mocked delay does not trigger
+	// the deadline excess)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the request after a second
+	go func() {
+		time.Sleep(time.Second)
+		cancel()
+	}()
+
+	// Execute the request
+	start := time.Now()
+	if err := req.RunWithContext(ctx); err == nil || err.Error() != fmt.Sprintf("Get \"%s\": context canceled", uri) {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("request with cancelled context took longer than expected (%v)", elapsed)
+	}
+}
+
 func TestRetryInvalidOptions(t *testing.T) {
 	uri := joinURI(httpsEndpoint, "invalidretries")
 	if err := New(http.MethodPut, uri).
