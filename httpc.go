@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/labstack/echo"
 )
 
 var defaultacceptedResponseCodes = []int{
@@ -449,12 +447,12 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 			Body:                   resp.Body,
 		}
 		if resp.Body != nil {
-			data, err := ioutil.ReadAll(resp.Body)
+			data, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return err
 			}
-			resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
-			responseValidationInput.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+			resp.Body = io.NopCloser(bytes.NewBuffer(data))
+			responseValidationInput.Body = io.NopCloser(bytes.NewBuffer(data))
 		}
 
 		// Validate response
@@ -479,7 +477,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		}
 
 		// Attempt to decode a generic JSON error from the response body
-		var extraErr echo.HTTPError
+		var extraErr HTTPError
 		if err := jsoniter.NewDecoder(bytes.NewReader(buf.Bytes())).Decode(&extraErr); err == nil {
 			return fmt.Errorf("%s [%.512s]", resp.Status, fmt.Sprintf("code=%d, message=%v", extraErr.Code, extraErr.Message))
 		}
@@ -523,9 +521,9 @@ func (r *Request) setBody(req *http.Request) {
 
 		// If a delay was requested, assign a delayed reader
 		if r.delay > 0 {
-			req.Body = ioutil.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay))
+			req.Body = io.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay))
 		} else {
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(r.body))
+			req.Body = io.NopCloser(bytes.NewBuffer(r.body))
 		}
 
 		// Pass content length to enforce non-chunked http request.
