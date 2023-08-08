@@ -9,6 +9,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// HTTPError represents an error that occurred while handling a request
+// Identical to struct used in labstack/echo
+type HTTPError struct {
+	Code     int
+	Message  interface{}
+	Internal error // Stores the error returned by an external dependency
+}
+
 // Copy copies the response body into any io.Writer
 func Copy(w io.Writer) func(resp *http.Response) error {
 	return func(resp *http.Response) error {
