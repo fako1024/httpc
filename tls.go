@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 )
 
@@ -59,7 +59,7 @@ func readClientCertificateFiles(certFile, keyFile, caFile string) ([]byte, []byt
 	}
 
 	// Read CA certificate from file
-	caCert, err := ioutil.ReadFile(filepath.Clean(caFile))
+	caCert, err := os.ReadFile(filepath.Clean(caFile))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to read CA certificate: %w", err)
 	}
@@ -71,13 +71,13 @@ func readClientCertificateFiles(certFile, keyFile, caFile string) ([]byte, []byt
 // respective files
 func readclientKeyCertificate(certFile, keyFile string) ([]byte, []byte, error) {
 	// Read the client certificate file
-	clientCert, err := ioutil.ReadFile(filepath.Clean(certFile))
+	clientCert, err := os.ReadFile(filepath.Clean(certFile))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Read the client key file
-	clientKey, err := ioutil.ReadFile(filepath.Clean(keyFile))
+	clientKey, err := os.ReadFile(filepath.Clean(keyFile))
 	if err != nil {
 		return nil, nil, err
 	}

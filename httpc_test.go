@@ -8,7 +8,7 @@ import (
 	"encoding/gob"
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -202,7 +202,7 @@ func TestRetries(t *testing.T) {
 	g.Persist()
 	g.Put(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
 
-		bodyData, err := ioutil.ReadAll(r1.Body)
+		bodyData, err := io.ReadAll(r1.Body)
 		if err != nil {
 			return false, err
 		}
@@ -264,7 +264,7 @@ func TestRetriesErrorFn(t *testing.T) {
 	g := gock.New(uri)
 	g.Persist()
 	g.Put(path.Base(uri)).AddMatcher(func(r1 *http.Request, r2 *gock.Request) (bool, error) {
-		bodyData, err := ioutil.ReadAll(r1.Body)
+		bodyData, err := io.ReadAll(r1.Body)
 		if err != nil {
 			return false, err
 		}
@@ -400,7 +400,7 @@ func testJSONRequest(duplicateHeader bool, t *testing.T) {
 			return false, fmt.Errorf("unexpected content-type values: %s", contentTypeValues)
 		}
 
-		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		bodyBytes, err := io.ReadAll(r1.Body)
 		if err != nil {
 			return false, err
 		}
@@ -483,7 +483,7 @@ func testYAMLRequest(duplicateHeader bool, t *testing.T) {
 			return false, fmt.Errorf("unexpected content-type values: %s", contentTypeValues)
 		}
 
-		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		bodyBytes, err := io.ReadAll(r1.Body)
 		if err != nil {
 			return false, err
 		}
@@ -566,7 +566,7 @@ func testXMLRequest(duplicateHeader bool, t *testing.T) {
 			return false, fmt.Errorf("unexpected content-type values: %s", contentTypeValues)
 		}
 
-		bodyBytes, err := ioutil.ReadAll(r1.Body)
+		bodyBytes, err := io.ReadAll(r1.Body)
 		if err != nil {
 			return false, err
 		}
@@ -792,7 +792,7 @@ func TestClientDelay(t *testing.T) {
 	g := gock.New(uri)
 	g.Get(path.Base(uri)).
 		AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
-			bodyBytes, err := ioutil.ReadAll(arg1.Body)
+			bodyBytes, err := io.ReadAll(arg1.Body)
 			if err != nil {
 				return false, err
 			}
@@ -1084,7 +1084,7 @@ func TestTable(t *testing.T) {
 			expectedStatusCode: http.StatusOK,
 			responseBody:       []byte(helloWorldString),
 			responseFn: func(resp *http.Response) error {
-				bodyBytes, err := ioutil.ReadAll(resp.Body)
+				bodyBytes, err := io.ReadAll(resp.Body)
 				if err != nil {
 					return err
 				}
@@ -1204,7 +1204,7 @@ func runGenericRequest(k *Request, v testCase) error {
 	// Handle request body
 	if v.requestBody != nil {
 		g.AddMatcher(gock.MatchFunc(func(arg1 *http.Request, arg2 *gock.Request) (bool, error) {
-			bodyBytes, err := ioutil.ReadAll(arg1.Body)
+			bodyBytes, err := io.ReadAll(arg1.Body)
 			if err != nil {
 				return false, err
 			}
@@ -1302,7 +1302,7 @@ func joinURI(base, suffix string) string {
 
 func genTempFile(data []byte) (string, error) {
 
-	tmpfile, err := ioutil.TempFile("", "httpc_test")
+	tmpfile, err := os.CreateTemp("", "httpc_test")
 	if err != nil {
 		return "", err
 	}

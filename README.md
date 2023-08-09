@@ -61,7 +61,7 @@ fmt.Println(buf.String())
 
 #### Perform HTTPS GET request (with query parameters + headers + basic auth), validating request and response against OpenAPIv3 specification
 ```go
-openAPIFileData, err := ioutil.ReadFile("/tmp/openapi.json")
+openAPIFileData, err := os.ReadFile("/tmp/openapi.json")
 if err != nil {
 	log.Fatalf("Error opening OpenAPI specification file: %s", err)
 }
