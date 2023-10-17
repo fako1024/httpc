@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -16,7 +17,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -77,7 +77,7 @@ func TestInvalidRequest(t *testing.T) {
 	if err := New("", "NOTVALID").Run(); err == nil || err.Error() != `Get "NOTVALID": unsupported protocol scheme ""` {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
-	if err := New(http.MethodGet, "").EncodeJSON(struct{}{}).Body([]byte{0}).Run(); err == nil || !strings.Contains(err.Error(), errorEncodedRawBodyCollision.Error()) {
+	if err := New(http.MethodGet, "").EncodeJSON(struct{}{}).Body([]byte{0}).Run(); err == nil || !errors.Is(err, errorEncodedRawBodyCollision) {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
 }
