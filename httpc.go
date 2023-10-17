@@ -316,6 +316,10 @@ func (r *Request) prepBody() (body io.ReadCloser, err error) {
 		}
 	}
 
+	if len(r.body) == 0 {
+		return nil, nil
+	}
+
 	// If a delay was requested, assign a delayed reader
 	if r.delay > 0 {
 		return io.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay)), nil
