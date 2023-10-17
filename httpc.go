@@ -298,13 +298,51 @@ func (r *Request) Run() error {
 	return r.RunWithContext(context.Background())
 }
 
+func (r *Request) prepBody() (body io.ReadCloser, err error) {
+	// If requested, parse the requst body using the specified encoder
+	if r.bodyEncoder != nil {
+		if len(r.body) > 0 {
+			return body, fmt.Errorf("cannot use both body encoding and raw body content")
+		}
+
+		r.body, err = r.bodyEncoder.Encode()
+		if err != nil {
+			return body, fmt.Errorf("error encoding body: %w", err)
+		}
+	}
+
+	// If a delay was requested, assign a delayed reader
+	if r.delay > 0 {
+		return io.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay)), nil
+	}
+
+	return io.NopCloser(bytes.NewBuffer(r.body)), nil
+}
+
 // RunWithContext executes a request using a specific context
 func (r *Request) RunWithContext(ctx context.Context) error {
 
+	reqBody, err := r.prepBody()
+	if err != nil {
+		return fmt.Errorf("error preparing request body: %w", err)
+	}
+
 	// Initialize new http.Request
-	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, nil)
+	//
+	// From net/http:
+	//
+	// 	If body is of type *bytes.Buffer, *bytes.Reader, or *strings.Reader, the returned request's ContentLength is set to its exact value
+	// 	(instead of -1), GetBody is populated (so 307 and 308 redirects can replay the body), and Body is set to NoBody if the ContentLength
+	// 	is 0.
+	//
+	// Hence, setting the reqBody via NewRequestWithContext will make sure that the internal handling of net/http sets the right parameters
+	// so redirect handling (amongst other things) is working properly
+	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, reqBody)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
+	}
+	if r.bodyEncoder != nil {
+		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
 	}
 
 	// Notify the server that the connection should be closed after completion of
@@ -315,23 +353,6 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	if r.httpAuthFunc != nil {
 		r.httpAuthFunc(req)
 	}
-
-	// If requested, parse the requst body using the specified encoder
-	if r.bodyEncoder != nil {
-
-		if len(r.body) > 0 {
-			return fmt.Errorf("cannot use both body encoding and raw body content")
-		}
-
-		r.body, err = r.bodyEncoder.Encode()
-		if err != nil {
-			return fmt.Errorf("error encoding body: %w", err)
-		}
-		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
-	}
-
-	// If a body was provided, assign it to the request
-	r.setBody(req)
 
 	// If URL parameters were provided, assign them to the request
 	if r.queryParams != nil {
