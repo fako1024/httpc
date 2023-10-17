@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -298,11 +299,15 @@ func (r *Request) Run() error {
 	return r.RunWithContext(context.Background())
 }
 
+var (
+	errorEncodedRawBodyCollision = errors.New("cannot use both body encoding and raw body content")
+)
+
 func (r *Request) prepBody() (body io.ReadCloser, err error) {
 	// If requested, parse the requst body using the specified encoder
 	if r.bodyEncoder != nil {
 		if len(r.body) > 0 {
-			return body, fmt.Errorf("cannot use both body encoding and raw body content")
+			return body, errorEncodedRawBodyCollision
 		}
 
 		r.body, err = r.bodyEncoder.Encode()

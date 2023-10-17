@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,7 +77,7 @@ func TestInvalidRequest(t *testing.T) {
 	if err := New("", "NOTVALID").Run(); err == nil || err.Error() != `Get "NOTVALID": unsupported protocol scheme ""` {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
-	if err := New(http.MethodGet, "").EncodeJSON(struct{}{}).Body([]byte{0}).Run(); err == nil || err.Error() != `cannot use both body encoding and raw body content` {
+	if err := New(http.MethodGet, "").EncodeJSON(struct{}{}).Body([]byte{0}).Run(); err == nil || !strings.Contains(err.Error(), errorEncodedRawBodyCollision.Error()) {
 		t.Fatalf("Unexpected success creating invalid request: %s", err)
 	}
 }
