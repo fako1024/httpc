@@ -304,6 +304,7 @@ var (
 )
 
 func (r *Request) prepBody() (body io.ReadCloser, err error) {
+
 	// If requested, parse the requst body using the specified encoder
 	if r.bodyEncoder != nil {
 		if len(r.body) > 0 {
@@ -317,7 +318,7 @@ func (r *Request) prepBody() (body io.ReadCloser, err error) {
 	}
 
 	if len(r.body) == 0 {
-		return nil, nil
+		return http.NoBody, nil
 	}
 
 	// If a delay was requested, assign a delayed reader
@@ -343,13 +344,17 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	// 	If body is of type *bytes.Buffer, *bytes.Reader, or *strings.Reader, the returned request's ContentLength is set to its exact value
 	// 	(instead of -1), GetBody is populated (so 307 and 308 redirects can replay the body), and Body is set to NoBody if the ContentLength
 	// 	is 0.
-	//
-	// Hence, setting the reqBody via NewRequestWithContext will make sure that the internal handling of net/http sets the right parameters
-	// so redirect handling (amongst other things) is working properly
 	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, reqBody)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
+	req.ContentLength = int64(len(r.body))
+	if req.GetBody == nil {
+		req.GetBody = func() (io.ReadCloser, error) {
+			return reqBody, nil
+		}
+	}
+
 	if r.bodyEncoder != nil {
 		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
 	}

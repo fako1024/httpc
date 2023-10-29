@@ -319,6 +319,84 @@ func TestRetriesErrorFn(t *testing.T) {
 	}
 }
 
+func TestSlashRedirectHandling(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "original")
+	redirectURI := uri + "/"
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Post(path.Base(uri)).
+		Reply(http.StatusTemporaryRedirect).
+		SetHeader("Location", redirectURI)
+
+	gRedir := gock.New(redirectURI)
+	gRedir.Persist()
+	gRedir.Post(path.Base(uri) + "/").
+		Reply(http.StatusOK).
+		Body(bytes.NewBufferString(`{"status":42,"msg":"JSON String"}`))
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "JSON String",
+	}
+
+	var respBody = struct {
+		Status  int    `json:"status"`
+		Message string `json:"msg"`
+	}{}
+
+	req := New(http.MethodPost, uri).EncodeJSON(reqBody).ParseJSON(&respBody)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if respBody.Status != reqBody.Status || respBody.Message != reqBody.Message {
+		t.Fatal("response body doesn't match what should be returned by redirect endpoint")
+	}
+}
+
+func TestRedirectHandling(t *testing.T) {
+	uri := joinURI(httpsEndpoint, "original")
+	redirectURI := joinURI(httpsEndpoint, "redirected")
+
+	// Set up a mock matcher
+	g := gock.New(uri)
+	g.Post(path.Base(uri)).
+		Reply(http.StatusPermanentRedirect).
+		SetHeader("Location", redirectURI)
+
+	gRedir := gock.New(redirectURI)
+	gRedir.Persist()
+	gRedir.Post(path.Base(redirectURI)).
+		Reply(http.StatusOK).
+		Body(bytes.NewBufferString(`{"status":42,"msg":"JSON String"}`))
+
+	reqBody := testStruct{
+		Status:  42,
+		Message: "JSON String",
+	}
+
+	var respBody = struct {
+		Status  int    `json:"status"`
+		Message string `json:"msg"`
+	}{}
+
+	req := New(http.MethodPost, uri).EncodeJSON(reqBody).ParseJSON(&respBody)
+	gock.InterceptClient(req.client)
+	defer gock.RestoreClient(req.client)
+
+	if err := req.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if respBody.Status != reqBody.Status || respBody.Message != reqBody.Message {
+		t.Fatal("response body doesn't match what should be returned by redirect endpoint")
+	}
+}
+
 type gobEncoder struct {
 	v interface{}
 }
