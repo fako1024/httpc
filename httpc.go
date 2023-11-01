@@ -335,16 +335,14 @@ func (r *Request) setBody(req *http.Request) (err error) {
 			dr := newDelayedReader(bytes.NewBuffer(bodyBytes), r.delay)
 
 			req.GetBody = func() (io.ReadCloser, error) {
-				snapshot := newDelayedReader(bytes.NewBuffer(bodyBytes), r.delay)
+				snapshot := newDelayedReader(bytes.NewReader(bodyBytes), r.delay)
 				return io.NopCloser(snapshot), nil
 			}
 			req.Body = io.NopCloser(dr)
 			return nil
 		}
 
-		buf := bytes.NewBuffer(bodyBytes)
-
-		fmt.Println(time.Now(), "buf =", buf.String())
+		buf := bytes.NewReader(bodyBytes)
 
 		req.GetBody = func() (io.ReadCloser, error) {
 			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
