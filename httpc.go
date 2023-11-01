@@ -335,7 +335,6 @@ func (r *Request) setBody(req *http.Request) (err error) {
 			dr := newDelayedReader(bytes.NewBuffer(bodyBytes), r.delay)
 
 			req.GetBody = func() (io.ReadCloser, error) {
-				fmt.Println("buf: called GetBody")
 				snapshot := *dr
 				return io.NopCloser(&snapshot), nil
 			}
@@ -347,7 +346,7 @@ func (r *Request) setBody(req *http.Request) (err error) {
 
 		req.GetBody = func() (io.ReadCloser, error) {
 			snapshot := *buf
-			fmt.Println("buf =", snapshot.String(), "; length =", snapshot.Len())
+			fmt.Println(time.Now(), "buf =", buf.String(), "; snapshot =", snapshot.String(), "; length =", snapshot.Len())
 			return io.NopCloser(&snapshot), nil
 		}
 		req.Body = io.NopCloser(buf)
