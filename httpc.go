@@ -362,8 +362,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
-	err = r.setBody(req)
-	if err != nil {
+	if err = r.setBody(req); err != nil {
 		return fmt.Errorf("failed to set request body: %w", err)
 	}
 
@@ -468,8 +467,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		case <-ticker.C:
 		}
 
-		err = r.setBody(req)
-		if err != nil {
+		if err = r.setBody(req); err != nil {
 			return fmt.Errorf("failed to set request body: %w", err)
 		}
 		resp, err = r.client.Do(req)
