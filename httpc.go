@@ -303,60 +303,67 @@ var (
 	errorEncodedRawBodyCollision = errors.New("cannot use both body encoding and raw body content")
 )
 
-func (r *Request) prepBody() (body io.ReadCloser, err error) {
+func (r *Request) setBody(req *http.Request) (err error) {
 
 	// If requested, parse the requst body using the specified encoder
+	bodyBytes := r.body
 	if r.bodyEncoder != nil {
 		if len(r.body) > 0 {
-			return body, errorEncodedRawBodyCollision
+			return errorEncodedRawBodyCollision
 		}
 
-		r.body, err = r.bodyEncoder.Encode()
+		bodyBytes, err = r.bodyEncoder.Encode()
 		if err != nil {
-			return body, fmt.Errorf("error encoding body: %w", err)
+			return fmt.Errorf("error encoding body: %w", err)
 		}
+		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
 	}
 
-	if len(r.body) == 0 {
-		return http.NoBody, nil
-	}
+	contentLength := len(bodyBytes)
 
-	// If a delay was requested, assign a delayed reader
-	if r.delay > 0 {
-		return io.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay)), nil
-	}
-
-	return io.NopCloser(bytes.NewBuffer(r.body)), nil
-}
-
-// RunWithContext executes a request using a specific context
-func (r *Request) RunWithContext(ctx context.Context) error {
-
-	reqBody, err := r.prepBody()
-	if err != nil {
-		return fmt.Errorf("error preparing request body: %w", err)
-	}
-
-	// Initialize new http.Request
-	//
 	// From net/http:
 	//
 	// 	If body is of type *bytes.Buffer, *bytes.Reader, or *strings.Reader, the returned request's ContentLength is set to its exact value
 	// 	(instead of -1), GetBody is populated (so 307 and 308 redirects can replay the body), and Body is set to NoBody if the ContentLength
 	// 	is 0.
-	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, reqBody)
+	req.Body = http.NoBody
+	if contentLength > 0 {
+		req.ContentLength = int64(contentLength)
+
+		// If a delay was requested, assign a delayed reader
+		if r.delay > 0 {
+			dr := newDelayedReader(bytes.NewBuffer(bodyBytes), r.delay)
+
+			req.GetBody = func() (io.ReadCloser, error) {
+				snapshot := newDelayedReader(bytes.NewReader(bodyBytes), r.delay)
+				return io.NopCloser(snapshot), nil
+			}
+			req.Body = io.NopCloser(dr)
+			return nil
+		}
+
+		buf := bytes.NewReader(bodyBytes)
+
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+		}
+		req.Body = io.NopCloser(buf)
+	}
+
+	return nil
+}
+
+// RunWithContext executes a request using a specific context
+func (r *Request) RunWithContext(ctx context.Context) error {
+
+	// Initialize new http.Request
+
+	req, err := http.NewRequestWithContext(ctx, r.method, r.uri, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
-	req.ContentLength = int64(len(r.body))
-	if req.GetBody == nil {
-		req.GetBody = func() (io.ReadCloser, error) {
-			return reqBody, nil
-		}
-	}
-
-	if r.bodyEncoder != nil {
-		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
+	if err = r.setBody(req); err != nil {
+		return fmt.Errorf("failed to set request body: %w", err)
 	}
 
 	// Notify the server that the connection should be closed after completion of
@@ -460,7 +467,9 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		case <-ticker.C:
 		}
 
-		r.setBody(req)
+		if err = r.setBody(req); err != nil {
+			return fmt.Errorf("failed to set request body: %w", err)
+		}
 		resp, err = r.client.Do(req)
 	}
 	if retryErrFn(resp, err) {
@@ -549,23 +558,6 @@ func (r *Request) setRetryHandling() (func(resp *http.Response, err error) bool,
 	}
 
 	return retryErrFn, nil
-}
-
-func (r *Request) setBody(req *http.Request) {
-	if len(r.body) > 0 {
-
-		// If a delay was requested, assign a delayed reader
-		if r.delay > 0 {
-			req.Body = io.NopCloser(newDelayedReader(bytes.NewBuffer(r.body), r.delay))
-		} else {
-			req.Body = io.NopCloser(bytes.NewBuffer(r.body))
-		}
-
-		// Pass content length to enforce non-chunked http request.
-		// Since data is completly in mem it's useless anyways.
-		// Also needed to mitigate a bug in PHP...
-		req.ContentLength = int64(len(r.body))
-	}
 }
 
 type delayReader struct {
