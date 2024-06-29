@@ -461,10 +461,10 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		// In both cases simply continue and have the client handle the (potentially
 		// cancelled) context (that way the same error is returned no matter _when_
 		// the context was cancelled)
-		ticker := time.NewTicker(r.retryIntervals[i])
+		timer := time.NewTimer(r.retryIntervals[i])
 		select {
 		case <-ctx.Done():
-		case <-ticker.C:
+		case <-timer.C:
 		}
 
 		if err = r.setBody(req); err != nil {
