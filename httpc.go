@@ -464,6 +464,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		timer := time.NewTimer(r.retryIntervals[i])
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 		case <-timer.C:
 		}
 
