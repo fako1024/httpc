@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -519,6 +520,11 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		buf := new(bytes.Buffer)
 		if _, err := io.Copy(buf, resp.Body); err != nil {
 			return fmt.Errorf("failed to load body into buffer for error handling: %w", err)
+		}
+
+		// Handle RFC 9457
+		if strings.EqualFold(resp.Header.Get("Content-Type"), "application/problem+json") {
+			return fmt.Errorf("%s [body=%.512s]", resp.Status, buf.String())
 		}
 
 		// Attempt to decode a generic JSON error from the response body
