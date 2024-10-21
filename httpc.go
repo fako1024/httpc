@@ -9,12 +9,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
 	jsoniter "github.com/json-iterator/go"
+)
+
+const (
+	contentTypeHeaderKey        = "Content-Type"
+	contentTypeHeaderValRFC9457 = "application/problem+json"
 )
 
 var defaultacceptedResponseCodes = []int{
@@ -316,7 +322,7 @@ func (r *Request) setBody(req *http.Request) (err error) {
 		if err != nil {
 			return fmt.Errorf("error encoding body: %w", err)
 		}
-		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
+		req.Header.Set(contentTypeHeaderKey, r.bodyEncoder.ContentType())
 	}
 
 	contentLength := len(bodyBytes)
@@ -519,6 +525,11 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		buf := new(bytes.Buffer)
 		if _, err := io.Copy(buf, resp.Body); err != nil {
 			return fmt.Errorf("failed to load body into buffer for error handling: %w", err)
+		}
+
+		// Handle RFC 9457
+		if strings.EqualFold(resp.Header.Get(contentTypeHeaderKey), contentTypeHeaderValRFC9457) {
+			return fmt.Errorf("%s [body=%s]", resp.Status, buf.String())
 		}
 
 		// Attempt to decode a generic JSON error from the response body

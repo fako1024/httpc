@@ -12,8 +12,9 @@ import (
 // HTTPError represents an error that occurred while handling a request
 // Identical to struct used in labstack/echo
 type HTTPError struct {
-	Code     int
-	Message  interface{}
+	Code    int         `json:"code,omitempty"`
+	Message interface{} `json:"message,omitempty"`
+
 	Internal error // Stores the error returned by an external dependency
 }
 
