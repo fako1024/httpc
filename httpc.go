@@ -18,6 +18,11 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+const (
+	contentTypeHeaderKey        = "Content-Type"
+	contentTypeHeaderValRFC9457 = "application/problem+json"
+)
+
 var defaultacceptedResponseCodes = []int{
 	http.StatusOK,
 	http.StatusCreated,
@@ -317,7 +322,7 @@ func (r *Request) setBody(req *http.Request) (err error) {
 		if err != nil {
 			return fmt.Errorf("error encoding body: %w", err)
 		}
-		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
+		req.Header.Set(contentTypeHeaderKey, r.bodyEncoder.ContentType())
 	}
 
 	contentLength := len(bodyBytes)
@@ -523,8 +528,8 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		}
 
 		// Handle RFC 9457
-		if strings.EqualFold(resp.Header.Get("Content-Type"), "application/problem+json") {
-			return fmt.Errorf("%s [body=%.512s]", resp.Status, buf.String())
+		if strings.EqualFold(resp.Header.Get(contentTypeHeaderKey), contentTypeHeaderValRFC9457) {
+			return fmt.Errorf("%s [body=%s]", resp.Status, buf.String())
 		}
 
 		// Attempt to decode a generic JSON error from the response body
