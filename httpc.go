@@ -212,19 +212,19 @@ func (r *Request) Encode(encoder Encoder) *Request {
 }
 
 // EncodeJSON encodes and sets the body for the client call using JSON encoding
-func (r *Request) EncodeJSON(v interface{}) *Request {
+func (r *Request) EncodeJSON(v any) *Request {
 	r.bodyEncoder = JSONEncoder{v}
 	return r
 }
 
 // EncodeYAML encodes and sets the body for the client call using YAML encoding
-func (r *Request) EncodeYAML(v interface{}) *Request {
+func (r *Request) EncodeYAML(v any) *Request {
 	r.bodyEncoder = YAMLEncoder{v}
 	return r
 }
 
 // EncodeXML encodes and sets the body for the client call using XML encoding
-func (r *Request) EncodeXML(v interface{}) *Request {
+func (r *Request) EncodeXML(v any) *Request {
 	r.bodyEncoder = XMLEncoder{v}
 	return r
 }
@@ -236,19 +236,19 @@ func (r *Request) ParseFn(parseFn func(*http.Response) error) *Request {
 }
 
 // ParseJSON parses the result of the client call as JSON
-func (r *Request) ParseJSON(v interface{}) *Request {
+func (r *Request) ParseJSON(v any) *Request {
 	r.parseFn = ParseJSON(v)
 	return r
 }
 
 // ParseYAML parses the result of the client call as YAML
-func (r *Request) ParseYAML(v interface{}) *Request {
+func (r *Request) ParseYAML(v any) *Request {
 	r.parseFn = ParseYAML(v)
 	return r
 }
 
 // ParseXML parses the result of the client call as XML
-func (r *Request) ParseXML(v interface{}) *Request {
+func (r *Request) ParseXML(v any) *Request {
 	r.parseFn = ParseXML(v)
 	return r
 }

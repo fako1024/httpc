@@ -399,7 +399,7 @@ func TestRedirectHandling(t *testing.T) {
 }
 
 type gobEncoder struct {
-	v interface{}
+	v any
 }
 
 // Encode fulfills the Encoder interface, performing the actual encoding
