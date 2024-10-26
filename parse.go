@@ -12,8 +12,9 @@ import (
 // HTTPError represents an error that occurred while handling a request
 // Identical to struct used in labstack/echo
 type HTTPError struct {
-	Code     int
-	Message  interface{}
+	Code    int `json:"code,omitempty"`
+	Message any `json:"message,omitempty"`
+
 	Internal error // Stores the error returned by an external dependency
 }
 
@@ -26,21 +27,21 @@ func Copy(w io.Writer) func(resp *http.Response) error {
 }
 
 // ParseJSON parses the response body as JSON into a struct
-func ParseJSON(v interface{}) func(resp *http.Response) error {
+func ParseJSON(v any) func(resp *http.Response) error {
 	return func(resp *http.Response) error {
 		return jsoniter.NewDecoder(resp.Body).Decode(v)
 	}
 }
 
 // ParseYAML parses the response body as YAML into a struct
-func ParseYAML(v interface{}) func(resp *http.Response) error {
+func ParseYAML(v any) func(resp *http.Response) error {
 	return func(resp *http.Response) error {
 		return yaml.NewDecoder(resp.Body).Decode(v)
 	}
 }
 
 // ParseXML parses the response body as XML into a struct
-func ParseXML(v interface{}) func(resp *http.Response) error {
+func ParseXML(v any) func(resp *http.Response) error {
 	return func(resp *http.Response) error {
 		return xml.NewDecoder(resp.Body).Decode(v)
 	}

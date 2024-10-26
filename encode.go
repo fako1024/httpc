@@ -19,7 +19,7 @@ type Encoder interface {
 
 // JSONEncoder provdes encoding to JSON
 type JSONEncoder struct {
-	v interface{}
+	v any
 }
 
 // Encode fulfills the Encoder interface, performing the actual encoding
@@ -34,7 +34,7 @@ func (e JSONEncoder) ContentType() string {
 
 // YAMLEncoder provdes encoding to YAML
 type YAMLEncoder struct {
-	v interface{}
+	v any
 }
 
 // Encode fulfills the Encoder interface, performing the actual encoding
@@ -49,7 +49,7 @@ func (e YAMLEncoder) ContentType() string {
 
 // XMLEncoder provdes encoding to XML
 type XMLEncoder struct {
-	v interface{}
+	v any
 }
 
 // Encode fulfills the Encoder interface, performing the actual encoding

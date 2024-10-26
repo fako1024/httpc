@@ -9,12 +9,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
 	jsoniter "github.com/json-iterator/go"
+)
+
+const (
+	contentTypeHeaderKey        = "Content-Type"
+	contentTypeHeaderValRFC9457 = "application/problem+json"
 )
 
 var defaultacceptedResponseCodes = []int{
@@ -206,19 +212,19 @@ func (r *Request) Encode(encoder Encoder) *Request {
 }
 
 // EncodeJSON encodes and sets the body for the client call using JSON encoding
-func (r *Request) EncodeJSON(v interface{}) *Request {
+func (r *Request) EncodeJSON(v any) *Request {
 	r.bodyEncoder = JSONEncoder{v}
 	return r
 }
 
 // EncodeYAML encodes and sets the body for the client call using YAML encoding
-func (r *Request) EncodeYAML(v interface{}) *Request {
+func (r *Request) EncodeYAML(v any) *Request {
 	r.bodyEncoder = YAMLEncoder{v}
 	return r
 }
 
 // EncodeXML encodes and sets the body for the client call using XML encoding
-func (r *Request) EncodeXML(v interface{}) *Request {
+func (r *Request) EncodeXML(v any) *Request {
 	r.bodyEncoder = XMLEncoder{v}
 	return r
 }
@@ -230,19 +236,19 @@ func (r *Request) ParseFn(parseFn func(*http.Response) error) *Request {
 }
 
 // ParseJSON parses the result of the client call as JSON
-func (r *Request) ParseJSON(v interface{}) *Request {
+func (r *Request) ParseJSON(v any) *Request {
 	r.parseFn = ParseJSON(v)
 	return r
 }
 
 // ParseYAML parses the result of the client call as YAML
-func (r *Request) ParseYAML(v interface{}) *Request {
+func (r *Request) ParseYAML(v any) *Request {
 	r.parseFn = ParseYAML(v)
 	return r
 }
 
 // ParseXML parses the result of the client call as XML
-func (r *Request) ParseXML(v interface{}) *Request {
+func (r *Request) ParseXML(v any) *Request {
 	r.parseFn = ParseXML(v)
 	return r
 }
@@ -316,7 +322,7 @@ func (r *Request) setBody(req *http.Request) (err error) {
 		if err != nil {
 			return fmt.Errorf("error encoding body: %w", err)
 		}
-		req.Header.Set("Content-Type", r.bodyEncoder.ContentType())
+		req.Header.Set(contentTypeHeaderKey, r.bodyEncoder.ContentType())
 	}
 
 	contentLength := len(bodyBytes)
@@ -519,6 +525,11 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		buf := new(bytes.Buffer)
 		if _, err := io.Copy(buf, resp.Body); err != nil {
 			return fmt.Errorf("failed to load body into buffer for error handling: %w", err)
+		}
+
+		// Handle RFC 9457
+		if strings.EqualFold(resp.Header.Get(contentTypeHeaderKey), contentTypeHeaderValRFC9457) {
+			return fmt.Errorf("%s [body=%s]", resp.Status, buf.String())
 		}
 
 		// Attempt to decode a generic JSON error from the response body

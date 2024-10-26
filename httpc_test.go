@@ -31,6 +31,7 @@ type testCase struct {
 	expectedStatusCode int
 	requestBody        []byte
 	responseBody       []byte
+	responseHeaders    map[string]string
 	responseFn         func(resp *http.Response) error
 	errorFn            func(resp *http.Response) error
 
@@ -398,7 +399,7 @@ func TestRedirectHandling(t *testing.T) {
 }
 
 type gobEncoder struct {
-	v interface{}
+	v any
 }
 
 // Encode fulfills the Encoder interface, performing the actual encoding
@@ -1223,6 +1224,12 @@ func TestTable(t *testing.T) {
 			responseBody:       []byte("no authorization"),
 			expectedError:      "401 Unauthorized [body=no authorization]",
 		},
+		New(http.MethodGet, joinURI(httpEndpoint, "422_response_withRFC9457")).AcceptedResponseCodes([]int{http.StatusNoContent}): {
+			expectedStatusCode: http.StatusUnprocessableEntity,
+			responseHeaders:    map[string]string{"Content-Type": "application/problem+json"},
+			responseBody:       []byte(`{"$schema":"http://localhost:8145/schemas/ErrorModel.json","title":"Unprocessable Entity","status":422,"detail":"validation failed","errors":[{"message":"expected object","location":"body.commonAnnotations"}]}]}`),
+			expectedError:      `422 Unprocessable Entity [body={"$schema":"http://localhost:8145/schemas/ErrorModel.json","title":"Unprocessable Entity","status":422,"detail":"validation failed","errors":[{"message":"expected object","location":"body.commonAnnotations"}]}]}]`,
+		},
 	}
 
 	for k, v := range testRequests {
@@ -1289,6 +1296,12 @@ func runGenericRequest(k *Request, v testCase) error {
 			}
 			return bytes.Equal(bodyBytes, v.requestBody), nil
 		}))
+	}
+
+	if len(v.responseHeaders) != 0 {
+		for key, value := range v.responseHeaders {
+			g.Response.SetHeader(key, value)
+		}
 	}
 
 	// Define the return code (and body, if provided)
