@@ -1420,7 +1420,7 @@ func runDummyTLSServer() {
 		panic(err)
 	}
 	if !caCertPool.AppendCertsFromPEM([]byte(testCACert)) {
-		panic(err)
+		panic("failed to append dummy TLS server certificates")
 	}
 
 	config := &tls.Config{

@@ -23,15 +23,21 @@ const (
 	contentTypeHeaderValRFC9457 = "application/problem+json"
 )
 
-var defaultacceptedResponseCodes = []int{
-	http.StatusOK,
-	http.StatusCreated,
-	http.StatusAccepted,
-}
+var (
+	// ErrErrRetryLimit denotes that the maximum number of retries has been reached,
+	// e.g. for a non-standard RetryErrFn (that may trigger on a non-err status)
+	ErrRetryLimit = errors.New("maximum number of request retries reached")
 
-var defaultRetryErrFn = func(resp *http.Response, err error) bool {
-	return err != nil
-}
+	defaultacceptedResponseCodes = []int{
+		http.StatusOK,
+		http.StatusCreated,
+		http.StatusAccepted,
+	}
+
+	defaultRetryErrFn = func(resp *http.Response, err error) bool {
+		return err != nil
+	}
+)
 
 // Params is an alias for a map of string key / value pairs
 type Params = map[string]string
@@ -479,8 +485,13 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		}
 		resp, err = r.client.Do(req)
 	}
+
+	// If the cause was an actual error, return it - otherwise return sentinel error
 	if retryErrFn(resp, err) {
-		return err
+		if err != nil {
+			return err
+		}
+		return ErrRetryLimit
 	}
 
 	defer func() {
