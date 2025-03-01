@@ -24,7 +24,8 @@ const (
 )
 
 var (
-	// ErrErrRetryLimit
+	// ErrErrRetryLimit denotes that the maximum number of retries has been reached,
+	// e.g. for a non-standard RetryErrFn (that may trigger on a non-err status)
 	ErrRetryLimit = errors.New("maximum number of request retries reached")
 
 	defaultacceptedResponseCodes = []int{
