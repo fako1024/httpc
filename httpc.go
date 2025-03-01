@@ -486,7 +486,7 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		resp, err = r.client.Do(req)
 	}
 
-	// If the cause was an actual error, return it - otherwise return sentinal error
+	// If the cause was an actual error, return it - otherwise return sentinel error
 	if retryErrFn(resp, err) {
 		if err != nil {
 			return err
