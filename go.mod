@@ -1,13 +1,11 @@
 module github.com/fako1024/httpc
 
-go 1.23.0
-
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/getkin/kin-openapi v0.131.0
 	github.com/json-iterator/go v1.1.12
-	golang.org/x/net v0.39.0
+	golang.org/x/net v0.55.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v3 v3.0.1
 )
