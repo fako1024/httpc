@@ -72,6 +72,9 @@ type Request struct {
 	httpClientFunc        func(c *http.Client)
 	httpRequestFunc       func(c *http.Request) error
 	httpAuthFunc          func(c *http.Request)
+
+	// Linux specific:
+	bindIface string
 }
 
 // New instantiates a new http client
@@ -403,6 +406,14 @@ func (r *Request) RunWithContext(ctx context.Context) error {
 		}
 	}
 
+	// If requested, bind to specific network interface (only supported on Linux)
+	if r.bindIface != "" {
+		if err := r.bindTo(); err != nil {
+			return err
+		}
+	}
+
+	// If requested, modify the http client before performing the request
 	if r.httpClientFunc != nil {
 		r.httpClientFunc(r.client)
 	}
